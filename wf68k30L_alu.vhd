@@ -20,7 +20,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright © 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.           ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -94,53 +94,53 @@ entity WF68K30L_ALU is
 end entity WF68K30L_ALU;
     
 architecture BEHAVIOUR of WF68K30L_ALU is
-type DIV_STATES is (IDLE, INIT, CALC);
-type SHIFT_STATES is (IDLE, RUN);
-signal ALU_COND_I           : boolean;
-signal ADR_MODE             : Std_Logic_Vector(2 downto 0);
-signal BITPOS               : integer range 0 to 31;
-signal BF_DATA_IN           : Std_Logic_Vector(39 downto 0);
-signal BF_LOWER_BND         : integer range 0 to 39;
-signal BF_OFFSET            : Std_Logic_Vector(31 downto 0);
-signal BF_UPPER_BND         : integer range 0 to 39;
-signal BF_WIDTH             : integer range 1 to 32;
-signal BIW_0                : Std_Logic_Vector(11 downto 0);
-signal BIW_1                : Std_Logic_Vector(15 downto 0);
-signal CAS2_COND            : boolean;
-signal CB_BCD               : std_logic;
-signal CHK_CMP_COND         : boolean;
-signal CHK2CMP2_DR          : bit;
-signal DIV_RDY              : bit;
-signal DIV_STATE            : DIV_STATES := IDLE;
-signal MSB                  : integer range 0 to 31;
-signal OP                   : OP_68K := UNIMPLEMENTED;
-signal OP1                  : Std_Logic_Vector(31 downto 0);
-signal OP2                  : Std_Logic_Vector(31 downto 0);
-signal OP3                  : Std_Logic_Vector(31 downto 0);
-signal OP1_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-signal OP2_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-signal OP3_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-signal OP_SIZE              : OP_SIZETYPE := LONG;
-signal QUOTIENT             : unsigned(31 downto 0);
-signal REMAINDER            : unsigned(31 downto 0);
-signal RESULT_BCDOP         : Std_Logic_Vector(7 downto 0);
-signal RESULT_BITFIELD      : Std_Logic_Vector(39 downto 0);
-signal RESULT_BITOP		    : Std_Logic_Vector(31 downto 0);
-signal RESULT_INTOP         : Std_Logic_Vector(31 downto 0);
-signal RESULT_LOGOP         : Std_Logic_Vector(31 downto 0);
-signal RESULT_MUL           : Std_Logic_Vector(63 downto 0);
-signal RESULT_SHIFTOP		: Std_Logic_Vector(31 downto 0);
-signal RESULT_OTHERS        : Std_Logic_Vector(31 downto 0);
-signal SHIFT_STATE	        : SHIFT_STATES;
-signal SHIFT_WIDTH          : Std_Logic_Vector(5 downto 0);
-signal SHIFT_WIDTH_IN       : Std_Logic_Vector(5 downto 0);
-signal SHFT_LOAD            : bit;
-signal SHFT_RDY             : bit;
-signal SHFT_EN	            : bit;
-signal STATUS_REG           : Std_Logic_Vector(15 downto 0);
-signal VFLAG_DIV            : std_logic;
-signal XFLAG_SHFT           : std_logic;
-signal XNZVC                : Std_Logic_Vector(4 downto 0);
+    type DIV_STATES is (IDLE, INIT, CALC);
+    type SHIFT_STATES is (IDLE, RUN);
+    signal ALU_COND_I           : boolean;
+    signal ADR_MODE             : Std_Logic_Vector(2 downto 0);
+    signal BITPOS               : integer range 0 to 31;
+    signal BF_DATA_IN           : Std_Logic_Vector(39 downto 0);
+    signal BF_LOWER_BND         : integer range 0 to 39;
+    signal BF_OFFSET            : Std_Logic_Vector(31 downto 0);
+    signal BF_UPPER_BND         : integer range 0 to 39;
+    signal BF_WIDTH             : integer range 1 to 32;
+    signal BIW_0                : Std_Logic_Vector(11 downto 0);
+    signal BIW_1                : Std_Logic_Vector(15 downto 0);
+    signal CAS2_COND            : boolean;
+    signal CB_BCD               : std_logic;
+    signal CHK_CMP_COND         : boolean;
+    signal CHK2CMP2_DR          : bit;
+    signal DIV_RDY              : bit;
+    signal DIV_STATE            : DIV_STATES := IDLE;
+    signal MSB                  : integer range 0 to 31;
+    signal OP                   : OP_68K := UNIMPLEMENTED;
+    signal OP1                  : Std_Logic_Vector(31 downto 0);
+    signal OP2                  : Std_Logic_Vector(31 downto 0);
+    signal OP3                  : Std_Logic_Vector(31 downto 0);
+    signal OP1_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+    signal OP2_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+    signal OP3_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+    signal OP_SIZE              : OP_SIZETYPE := LONG;
+    signal QUOTIENT             : unsigned(31 downto 0);
+    signal REMAINDER            : unsigned(31 downto 0);
+    signal RESULT_BCDOP         : Std_Logic_Vector(7 downto 0);
+    signal RESULT_BITFIELD      : Std_Logic_Vector(39 downto 0);
+    signal RESULT_BITOP		    : Std_Logic_Vector(31 downto 0);
+    signal RESULT_INTOP         : Std_Logic_Vector(31 downto 0);
+    signal RESULT_LOGOP         : Std_Logic_Vector(31 downto 0);
+    signal RESULT_MUL           : Std_Logic_Vector(63 downto 0);
+    signal RESULT_SHIFTOP		: Std_Logic_Vector(31 downto 0);
+    signal RESULT_OTHERS        : Std_Logic_Vector(31 downto 0);
+    signal SHIFT_STATE	        : SHIFT_STATES;
+    signal SHIFT_WIDTH          : Std_Logic_Vector(5 downto 0);
+    signal SHIFT_WIDTH_IN       : Std_Logic_Vector(5 downto 0);
+    signal SHFT_LOAD            : bit;
+    signal SHFT_RDY             : bit;
+    signal SHFT_EN	            : bit;
+    signal STATUS_REG           : Std_Logic_Vector(15 downto 0);
+    signal VFLAG_DIV            : std_logic;
+    signal XFLAG_SHFT           : std_logic;
+    signal XNZVC                : Std_Logic_Vector(4 downto 0);
 begin
     PARAMETER_BUFFER: process
     begin
@@ -167,12 +167,12 @@ begin
     end process PARAMETER_BUFFER;
 
     OPERANDS: process
-    -- During instruction execution, the buffers are written
-    -- before or during ALU_INIT and copied to the operands
-    -- during ALU_INIT.
-    variable OP1_BUFFER		: Std_Logic_Vector(31 downto 0);
-    variable OP2_BUFFER		: Std_Logic_Vector(31 downto 0);
-    variable OP3_BUFFER		: Std_Logic_Vector(31 downto 0);
+        -- During instruction execution, the buffers are written
+        -- before or during ALU_INIT and copied to the operands
+        -- during ALU_INIT.
+        variable OP1_BUFFER		: Std_Logic_Vector(31 downto 0);
+        variable OP2_BUFFER		: Std_Logic_Vector(31 downto 0);
+        variable OP3_BUFFER		: Std_Logic_Vector(31 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if LOAD_OP1 = '1' then
@@ -226,7 +226,7 @@ begin
                 7 when BYTE;
 
     SIGNEXT: process(OP, OP1, OP2, OP3, OP_SIZE)
-    -- This module provides the required sign extensions.
+        -- This module provides the required sign extensions.
     begin
         case OP_SIZE is
             when LONG =>
@@ -255,16 +255,16 @@ begin
     end process SIGNEXT;
 
     P_BCDOP: process(OP, STATUS_REG, OP1, OP2)
-    -- The BCD operations are all byte wide and unsigned.
-    variable X_IN_I         : unsigned(0 downto 0);
-    variable TEMP0          : unsigned(4 downto 0);
-    variable TEMP1          : unsigned(4 downto 0);
-    variable Z_0            : unsigned(3 downto 0);
-    variable C_0            : unsigned(0 downto 0);
-    variable Z_1            : unsigned(3 downto 0);
-    variable C_1            : std_logic;
-    variable S_0            : unsigned(3 downto 0);
-    variable S_1            : unsigned(3 downto 0);
+        -- The BCD operations are all byte wide and unsigned.
+        variable X_IN_I         : unsigned(0 downto 0);
+        variable TEMP0          : unsigned(4 downto 0);
+        variable TEMP1          : unsigned(4 downto 0);
+        variable Z_0            : unsigned(3 downto 0);
+        variable C_0            : unsigned(0 downto 0);
+        variable Z_1            : unsigned(3 downto 0);
+        variable C_1            : std_logic;
+        variable S_0            : unsigned(3 downto 0);
+        variable S_1            : unsigned(3 downto 0);
     begin
         X_IN_I(0) := STATUS_REG(4); -- Inverted extended Flag.
 
@@ -319,8 +319,8 @@ begin
     BF_DATA_IN <= OP3 & OP2(7 downto 0);
 
     P_BITFIELD_OP: process(BF_DATA_IN, BF_LOWER_BND, BF_OFFSET, BF_UPPER_BND, BF_WIDTH, BIW_1, OP, OP1)
-    variable BF_NZ      : boolean;
-    variable BFFFO_CNT  : std_logic_vector(5 downto 0);
+        variable BF_NZ      : boolean;
+        variable BFFFO_CNT  : std_logic_vector(5 downto 0);
     begin
         RESULT_BITFIELD <= BF_DATA_IN; -- Default.
         case OP is
@@ -392,7 +392,7 @@ begin
     end process P_BITFIELD_OP;
 
     P_BITOP: process(BITPOS, OP, OP2)
-    -- Bit manipulation operations.
+        -- Bit manipulation operations.
     begin
         RESULT_BITOP <= OP2; -- The default is the unmanipulated data.
         --
@@ -409,16 +409,16 @@ begin
     end process P_BITOP;
 
     DIVISION: process
-    variable BITCNT         : integer range 0 to 64;
-    variable DIVIDEND       : unsigned(63 downto 0);
-    variable DIVISOR        : unsigned(31 downto 0);
-    variable QUOTIENT_REST  : unsigned(31 downto 0);
-    variable QUOTIENT_VAR   : unsigned(31 downto 0);
-    variable REMAINDER_REST : unsigned(31 downto 0);
-    variable REMAINDER_VAR  : unsigned(31 downto 0);
-    -- Be aware, that the destination and source operands
-    -- may be reloaded during the division operation. For
-    -- this, we use the restore values in case of an overflow.
+        variable BITCNT         : integer range 0 to 64;
+        variable DIVIDEND       : unsigned(63 downto 0);
+        variable DIVISOR        : unsigned(31 downto 0);
+        variable QUOTIENT_REST  : unsigned(31 downto 0);
+        variable QUOTIENT_VAR   : unsigned(31 downto 0);
+        variable REMAINDER_REST : unsigned(31 downto 0);
+        variable REMAINDER_VAR  : unsigned(31 downto 0);
+        -- Be aware, that the destination and source operands
+        -- may be reloaded during the division operation. For
+        -- this, we use the restore values in case of an overflow.
     begin
         wait until CLK = '1' and CLK' event;
         DIV_RDY <= '0';
@@ -521,9 +521,9 @@ begin
     end process DIVISION;
 
     P_INTOP: process(OP, OP1_SIGNEXT, OP2, OP2_SIGNEXT, ADR_MODE, STATUS_REG, RESULT_INTOP)
-    -- The integer arithmetics ADD, SUB, NEG and CMP in their different variations are modelled here.
-    variable X_IN_I         : Std_Logic_Vector(0 downto 0);
-    variable RESULT         : unsigned(31 downto 0);
+        -- The integer arithmetics ADD, SUB, NEG and CMP in their different variations are modelled here.
+        variable X_IN_I         : Std_Logic_Vector(0 downto 0);
+        variable RESULT         : unsigned(31 downto 0);
     begin
         X_IN_I(0) := STATUS_REG(4); -- Extended Flag.
         case OP is
@@ -562,10 +562,10 @@ begin
     end process P_INTOP;
 
     P_LOGOP: process(OP, OP1, OP2)
-    -- This process provides the logic operations:
-    -- AND, OR, XOR and NOT.
-    -- The logic operations require no signed / unsigned
-    -- modelling.
+        -- This process provides the logic operations:
+        -- AND, OR, XOR and NOT.
+        -- The logic operations require no signed / unsigned
+        -- modelling.
     begin
         case OP is
             when AND_B | ANDI | ANDI_TO_CCR | ANDI_TO_SR =>
@@ -583,8 +583,8 @@ begin
                   Std_Logic_Vector(unsigned(OP1) * unsigned(OP2));
 
     P_OTHERS: process(ALU_COND_I, BIW_0, OP3, OP2, OP2_SIGNEXT, OP, OP_SIZE, OP1, OP1_SIGNEXT, HILOn)
-    -- This process provides the calculation for special operations.
-    variable RESULT : unsigned(31 downto 0);
+        -- This process provides the calculation for special operations.
+        variable RESULT : unsigned(31 downto 0);
     begin
         RESULT := (others => '0');
         case OP is
@@ -819,20 +819,20 @@ begin
     COND_CODES: process(BF_DATA_IN, BF_LOWER_BND, BF_UPPER_BND, BIW_1, BITPOS, CB_BCD, CHK_CMP_COND, CLK, OP1, OP1_SIGNEXT, OP2, OP2_SIGNEXT,
                         OP3, OP3_SIGNEXT, MSB, OP, OP_SIZE, QUOTIENT, RESULT_BCDOP, RESULT_INTOP, RESULT_LOGOP, RESULT_MUL, RESULT_SHIFTOP, 
                         RESULT_OTHERS, SHIFT_WIDTH, STATUS_REG, USE_DREG, VFLAG_DIV, XFLAG_SHFT)
-    -- In this process all the condition codes X (eXtended), N (Negative)
-    -- Z (Zero), V (oVerflow) and C (Carry / borrow) are calculated for
-    -- all integer operations. Except for the MULS, MULU, DIVS, DIVU the
-    -- new conditions are valid one clock cycle after the operation starts.
-    -- For the multiplication and the division, the codes are valid after
-    -- BUSY is released.
-    variable TMP            : std_logic;
-    variable Z, RM, SM, DM  : std_logic;
-    variable CFLAG_SHFT     : std_logic;
-    variable VFLAG_SHFT     : std_logic;
-    variable NFLAG_DIV      : std_logic;
-    variable NFLAG_MUL      : std_logic;
-    variable VFLAG_MUL      : std_logic;
-    variable RM_SM_DM       : bit_vector(2 downto 0);
+        -- In this process all the condition codes X (eXtended), N (Negative)
+        -- Z (Zero), V (oVerflow) and C (Carry / borrow) are calculated for
+        -- all integer operations. Except for the MULS, MULU, DIVS, DIVU the
+        -- new conditions are valid one clock cycle after the operation starts.
+        -- For the multiplication and the division, the codes are valid after
+        -- BUSY is released.
+        variable TMP            : std_logic;
+        variable Z, RM, SM, DM  : std_logic;
+        variable CFLAG_SHFT     : std_logic;
+        variable VFLAG_SHFT     : std_logic;
+        variable NFLAG_DIV      : std_logic;
+        variable NFLAG_MUL      : std_logic;
+        variable VFLAG_MUL      : std_logic;
+        variable RM_SM_DM       : bit_vector(2 downto 0);
     begin
         -- Shifter C, X and V flags:
         if CLK = '1' and CLK' event then
@@ -1199,9 +1199,9 @@ begin
                   true when BIW_0(11 downto 8) = x"F" and (STATUS_REG(3) xor STATUS_REG(1)) = '1' else false; -- Less or equal.
 
     P_STATUS_REG: process
-    -- This process is the status register with
-    -- it's related logic.
-    variable SREG_MEM : std_logic_vector(15 downto 0) := x"0000";
+        -- This process is the status register with
+        -- it's related logic.
+        variable SREG_MEM : std_logic_vector(15 downto 0) := x"0000";
     begin
         wait until CLK = '1' and CLK' event;
         --

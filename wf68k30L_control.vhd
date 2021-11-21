@@ -233,73 +233,73 @@ entity WF68K30L_CONTROL is
 end entity WF68K30L_CONTROL;
 
 architecture BEHAVIOUR of WF68K30L_CONTROL is
-type BF_BYTEMATRIX is array (0 to 7, 1 to 32) of integer range 1 to 5;
--- The BF_BYTES constant selects the number of bytes required for read
--- or write during the bit field operations. This table is valid for
--- positive and negative offsets when using the twos complement in
--- the offset field.
-constant BF_BYTES_I : BF_BYTEMATRIX := 
-    ((1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4),
-     (1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5),
-     (1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5),
-     (1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5),
-     (1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5),
-     (1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5),
-     (1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5),
-     (1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5));
---
-type FETCH_STATES is (START_OP, FETCH_DISPL, FETCH_EXWORD_1, FETCH_D_LO, FETCH_D_HI, FETCH_OD_HI, FETCH_OD_LO, FETCH_ABS_HI, 
-                      FETCH_ABS_LO, FETCH_IDATA_B2, FETCH_IDATA_B1, FETCH_MEMADR, FETCH_OPERAND, INIT_EXEC_WB, SLEEP, SWITCH_STATE);
-type EXEC_WB_STATES is (IDLE, EXECUTE, ADR_PIPELINE, WRITEBACK, WRITE_DEST);
-signal FETCH_STATE          : FETCH_STATES;
-signal NEXT_FETCH_STATE     : FETCH_STATES;
-signal EXEC_WB_STATE        : EXEC_WB_STATES;
-signal NEXT_EXEC_WB_STATE   : EXEC_WB_STATES;
-signal ADR_MARK_USED_D		: bit;
-signal ADR_MARK_USED_I		: bit;
-signal ADR_MODE_I           : std_logic_vector(2 downto 0);
-signal ALU_ACK_I            : bit;
-signal ALU_INIT_I           : bit;
-signal ALU_TRIG             : bit;
-signal AR_WR_I1             : bit;
-signal BF_BYTES             : integer range 0 to 5;
-signal BF_HILOn             : bit;
-signal BF_OFFSET_I          : integer range 0 to 7;
-signal BF_WIDTH_I           : integer range 1 to 32;
-signal BIW_0_WB             : std_logic_vector(11 downto 0);
-signal BIW_1_WB             : std_logic_vector(15 downto 0);
-SIGNAL DATA_RD_I            : bit;
-SIGNAL DATA_WR_I            : bit;
-signal EW_RDY               : bit;
-signal INIT_ENTRY           : bit;
-signal MEM_INDIRECT         : bit;
-signal MEMADR_RDY           : bit;
-signal MOVEM_ADn_I          : bit;
-signal MOVEM_ADn_WB         : bit;
-signal MOVEM_COND           : boolean;
-signal MOVEM_FIRST_RD       : boolean;
-signal MOVEM_INH_WR         : boolean;
-signal MOVEM_LAST_WR        : boolean;
-signal MOVEM_PNTR           : std_logic_vector(3 downto 0);
-signal MOVEP_PNTR_I         : integer range 0 to 4;
-signal OD_REQ_16            : std_logic;
-signal OD_REQ_32            : std_logic;
-signal OP_SIZE_I            : OP_SIZETYPE;
-signal OP_SIZE_WB_I         : OP_SIZETYPE;
-signal OP_WB_I              : OP_68K := UNIMPLEMENTED;
-signal OW_RDY               : bit;
-signal PC_ADD_DISPL_I       : bit;
-signal PC_LOAD_I            : bit;
-signal PHASE2               : boolean;
-signal RD_RDY               : bit;
-signal READ_CYCLE           : bit;
-signal SBIT_I               : bit;
-signal SP_INC_L_I           : bit;
-signal SP_INC_W_I           : bit;
-signal SR_WR_I              : bit;
-signal UPDT_CC              : bit;
-signal WR_RDY               : bit;
-signal WRITE_CYCLE          : bit;
+    type BF_BYTEMATRIX is array (0 to 7, 1 to 32) of integer range 1 to 5;
+    -- The BF_BYTES constant selects the number of bytes required for read
+    -- or write during the bit field operations. This table is valid for
+    -- positive and negative offsets when using the twos complement in
+    -- the offset field.
+    constant BF_BYTES_I : BF_BYTEMATRIX := 
+        ((1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4),
+         (1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5),
+         (1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5),
+         (1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5),
+         (1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5),
+         (1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5),
+         (1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5),
+         (1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5));
+    --
+    type FETCH_STATES is (START_OP, FETCH_DISPL, FETCH_EXWORD_1, FETCH_D_LO, FETCH_D_HI, FETCH_OD_HI, FETCH_OD_LO, FETCH_ABS_HI, 
+                          FETCH_ABS_LO, FETCH_IDATA_B2, FETCH_IDATA_B1, FETCH_MEMADR, FETCH_OPERAND, INIT_EXEC_WB, SLEEP, SWITCH_STATE);
+    type EXEC_WB_STATES is (IDLE, EXECUTE, ADR_PIPELINE, WRITEBACK, WRITE_DEST);
+    signal FETCH_STATE          : FETCH_STATES;
+    signal NEXT_FETCH_STATE     : FETCH_STATES;
+    signal EXEC_WB_STATE        : EXEC_WB_STATES;
+    signal NEXT_EXEC_WB_STATE   : EXEC_WB_STATES;
+    signal ADR_MARK_USED_D		: bit;
+    signal ADR_MARK_USED_I		: bit;
+    signal ADR_MODE_I           : std_logic_vector(2 downto 0);
+    signal ALU_ACK_I            : bit;
+    signal ALU_INIT_I           : bit;
+    signal ALU_TRIG             : bit;
+    signal AR_WR_I1             : bit;
+    signal BF_BYTES             : integer range 0 to 5;
+    signal BF_HILOn             : bit;
+    signal BF_OFFSET_I          : integer range 0 to 7;
+    signal BF_WIDTH_I           : integer range 1 to 32;
+    signal BIW_0_WB             : std_logic_vector(11 downto 0);
+    signal BIW_1_WB             : std_logic_vector(15 downto 0);
+    SIGNAL DATA_RD_I            : bit;
+    SIGNAL DATA_WR_I            : bit;
+    signal EW_RDY               : bit;
+    signal INIT_ENTRY           : bit;
+    signal MEM_INDIRECT         : bit;
+    signal MEMADR_RDY           : bit;
+    signal MOVEM_ADn_I          : bit;
+    signal MOVEM_ADn_WB         : bit;
+    signal MOVEM_COND           : boolean;
+    signal MOVEM_FIRST_RD       : boolean;
+    signal MOVEM_INH_WR         : boolean;
+    signal MOVEM_LAST_WR        : boolean;
+    signal MOVEM_PNTR           : std_logic_vector(3 downto 0);
+    signal MOVEP_PNTR_I         : integer range 0 to 4;
+    signal OD_REQ_16            : std_logic;
+    signal OD_REQ_32            : std_logic;
+    signal OP_SIZE_I            : OP_SIZETYPE;
+    signal OP_SIZE_WB_I         : OP_SIZETYPE;
+    signal OP_WB_I              : OP_68K := UNIMPLEMENTED;
+    signal OW_RDY               : bit;
+    signal PC_ADD_DISPL_I       : bit;
+    signal PC_LOAD_I            : bit;
+    signal PHASE2               : boolean;
+    signal RD_RDY               : bit;
+    signal READ_CYCLE           : bit;
+    signal SBIT_I               : bit;
+    signal SP_INC_L_I           : bit;
+    signal SP_INC_W_I           : bit;
+    signal SR_WR_I              : bit;
+    signal UPDT_CC              : bit;
+    signal WR_RDY               : bit;
+    signal WRITE_CYCLE          : bit;
 begin
     BUSY <= '0' when EXEC_WB_STATE = IDLE and FETCH_STATE = START_OP and OPD_ACK = '0' and OW_RDY = '0' else
             '0' when EXEC_WB_STATE = IDLE and FETCH_STATE = SLEEP and OP = RTE else '1'; -- RTE: release to activate exception handler.
@@ -713,12 +713,12 @@ begin
                 '1' when (OP = CHK2 or OP = CMP2) and BIW_1(15) = '0' and ALU_INIT_I = '1' else '0'; -- Store compare information
 
     WB_BUFFER: process
-    -- This process stores the data for the 
-    -- WRITEBACK or the WRITE_DEST procedure.
-    -- The MOVEM condition is foreseen to bring
-    -- the ADn_WB and the PNTR_WB right in time
-    -- befor the address or data registers are
-    -- marked used.
+        -- This process stores the data for the 
+        -- WRITEBACK or the WRITE_DEST procedure.
+        -- The MOVEM condition is foreseen to bring
+        -- the ADn_WB and the PNTR_WB right in time
+        -- befor the address or data registers are
+        -- marked used.
     begin
         wait until CLK = '1' and CLK' event;
         if (OP_WB_I = BFCHG or OP_WB_I = BFCLR or OP_WB_I = BFINS or OP_WB_I = BFSET) and EXEC_WB_STATE = WRITE_DEST and WR_RDY = '1' and BF_BYTES = 5 then 
@@ -840,7 +840,7 @@ begin
                 '1' when OP_WB_I = MOVEC and BIW_0(0) = '1' and BIW_1(11 downto 0) = x"800" and EXEC_WB_STATE = WRITEBACK else '0';
 
     P_DISPLACEMENT: process
-    variable DISPL_VAR : std_logic_vector(31 downto 0);
+        variable DISPL_VAR : std_logic_vector(31 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         case OP is
@@ -983,10 +983,10 @@ begin
                        '1' when (OP = PACK or OP = UNPK) and BIW_0(3) = '1' else '0';
 
     P_ADR_USED_D: process
-    -- This flip flop delays the ADR_MARK_USED_I by one
-    -- clock cycle to provide correct timing due to the
-    -- one clock address calculation (see ADR_MODES in
-    -- the address register section.
+        -- This flip flop delays the ADR_MARK_USED_I by one
+        -- clock cycle to provide correct timing due to the
+        -- one clock address calculation (see ADR_MODES in
+        -- the address register section.
     begin
         wait until CLK = '1' and CLK' event;
         ADR_MARK_USED_D <= ADR_MARK_USED_I;
@@ -1070,7 +1070,7 @@ begin
                 '1' when TRACE_MODE = "01" and (PC_ADD_DISPL_I or PC_LOAD_I) = '1' else '0'; -- All branches and jumps.
 
     P_STATUSn: process
-    -- This logic is registered to enhance the system performance concerning fmax.
+        -- This logic is registered to enhance the system performance concerning fmax.
     begin
         wait until CLK = '1' and CLK' event;
         if FETCH_STATE = START_OP and NEXT_FETCH_STATE /= START_OP then
@@ -1081,7 +1081,7 @@ begin
     end process P_STATUSn;
 
     ADDRESS_OFFSET: process
-    variable ADR_OFFS_VAR: std_logic_vector(5 downto 0) := "000000";
+        variable ADR_OFFS_VAR: std_logic_vector(5 downto 0) := "000000";
     begin
         wait until CLK = '1' and CLK' event;
         if FETCH_STATE = START_OP then
@@ -1161,9 +1161,9 @@ begin
     end process BITFIELD_CONTROL;
 
     MOVEM_CONTROL: process(CLK, BIW_0, BIW_1, OP)
-    variable INDEX      : integer range 0 to 15 := 0;
-    variable MOVEM_PVAR : std_logic_vector(3 downto 0) := x"0";
-    variable BITS       : std_logic_vector(4 downto 0);
+        variable INDEX      : integer range 0 to 15 := 0;
+        variable MOVEM_PVAR : std_logic_vector(3 downto 0) := x"0";
+        variable BITS       : std_logic_vector(4 downto 0);
     begin
         if CLK = '1' and CLK' event then
             if FETCH_STATE = START_OP then
@@ -1255,8 +1255,8 @@ begin
     end process MOVEP_CONTROL;
 
     PHASE2_CONTROL: process
-    -- This is used for some operaions which require
-    -- two control sequences.
+        -- This is used for some operaions which require
+        -- two control sequences.
     begin
         wait until CLK = '1' and CLK' event;
         if FETCH_STATE = START_OP then
@@ -1308,9 +1308,9 @@ begin
     FETCH_DEC: process(ALU_BSY, ALU_COND, AR_IN_USE, BF_BYTES, BIW_0, BIW_1, DATA_VALID, DATA_RDY, DBcc_COND, DR_IN_USE, EW_ACK, EW_RDY, EXEC_WB_STATE, 
                        EXT_WORD, FETCH_STATE, IPENDn, MEM_INDIRECT, MEMADR_RDY, MOVEM_COND, MOVEM_PNTR, MOVEP_PNTR_I, NEXT_EXEC_WB_STATE, 
                        OP, OP_SIZE_I, BUSY_OPD, OPD_ACK, OW_RDY, PHASE2, RD_RDY, RERUN_RMC, RTE_RESUME, TRACE_MODE, OD_REQ_32, OD_REQ_16, WR_RDY)
-    -- ADH: avoid data hazard.
-    -- ASH: avoid structural hazard.
-    -- ACH: avoid control hazard.
+        -- ADH: avoid data hazard.
+        -- ASH: avoid structural hazard.
+        -- ACH: avoid control hazard.
     begin
         case FETCH_STATE is
             when START_OP =>

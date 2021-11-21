@@ -134,52 +134,52 @@ entity WF68K30L_BUS_INTERFACE is
 end entity WF68K30L_BUS_INTERFACE;
     
 architecture BEHAVIOR of WF68K30L_BUS_INTERFACE is
-type BUS_CTRL_STATES is (IDLE, START_CYCLE, DATA_C1C4);
-type ARB_STATES is(IDLE, GRANT, WAIT_RELEASE_1or3WIRE);
-type BUS_WIDTH_TYPE is(LONG_32, WORD, BYTE);
-type TIME_SLICES is (IDLE, S0, S1, S2, S3, S4, S5);
-signal ADR_10               : std_logic_vector(1 downto 0);
-signal ADR_OFFSET           : std_logic_vector(5 downto 0);
-signal ADR_OUT_I            : std_logic_vector(31 downto 0);
-signal AERR_I               : bit;
-signal ARB_STATE            : ARB_STATES := IDLE;
-signal AVEC_In              : std_logic;
-signal BGACK_In             : std_logic;
-signal BR_In                : std_logic;
-signal BUS_CTRL_STATE       : BUS_CTRL_STATES;
-signal BUS_CYC_RDY          : bit;
-signal BUS_FLT              : std_logic;
-signal BUS_WIDTH            : BUS_WIDTH_TYPE;
-signal CHK_RD               : bit;
-signal DATA_INMUX           : std_logic_vector(31 downto 0);
-signal DATA_RDY_I           : bit;
-signal DBUFFER              : std_logic_vector(31 downto 0);
-signal DSACK_In             : std_logic_vector(1 downto 0);
-signal DSACK_MEM            : bit_vector(1 downto 0);
-signal OCS_INH              : bit;
-signal HALT_In              : bit;
-signal HALTED               : bit;
-signal NEXT_ARB_STATE       : ARB_STATES;
-signal NEXT_BUS_CTRL_STATE  : BUS_CTRL_STATES;
-signal OBUFFER              : std_logic_vector(15 downto 0);
-signal OP_SIZE_I            : OP_SIZETYPE;
-signal OPCODE_ACCESS        : bit;
-signal OPCODE_RDY_I         : bit;
-signal READ_ACCESS          : bit;
-signal RESET_CPU_I          : bit;
-signal RESET_OUT_I          : std_logic;
-signal RETRY                : bit;
-signal SIZE_D               : std_logic_vector(1 downto 0);
-signal SIZE_I               : std_logic_vector(1 downto 0);
-signal SIZE_N               : std_logic_vector(2 downto 0) := "000";
-signal SLICE_CNT_N          : std_logic_vector(2 downto 0);
-signal SLICE_CNT_P          : std_logic_vector(2 downto 0);
-signal START_READ           : bit;
-signal STERM_In             : std_logic;
-signal T_SLICE              : TIME_SLICES;
-signal WAITSTATES           : bit;
-signal WP_BUFFER            : std_logic_vector(31 downto 0);
-signal WRITE_ACCESS         : bit;
+    type BUS_CTRL_STATES is (IDLE, START_CYCLE, DATA_C1C4);
+    type ARB_STATES is(IDLE, GRANT, WAIT_RELEASE_1or3WIRE);
+    type BUS_WIDTH_TYPE is(LONG_32, WORD, BYTE);
+    type TIME_SLICES is (IDLE, S0, S1, S2, S3, S4, S5);
+    signal ADR_10               : std_logic_vector(1 downto 0);
+    signal ADR_OFFSET           : std_logic_vector(5 downto 0);
+    signal ADR_OUT_I            : std_logic_vector(31 downto 0);
+    signal AERR_I               : bit;
+    signal ARB_STATE            : ARB_STATES := IDLE;
+    signal AVEC_In              : std_logic;
+    signal BGACK_In             : std_logic;
+    signal BR_In                : std_logic;
+    signal BUS_CTRL_STATE       : BUS_CTRL_STATES;
+    signal BUS_CYC_RDY          : bit;
+    signal BUS_FLT              : std_logic;
+    signal BUS_WIDTH            : BUS_WIDTH_TYPE;
+    signal CHK_RD               : bit;
+    signal DATA_INMUX           : std_logic_vector(31 downto 0);
+    signal DATA_RDY_I           : bit;
+    signal DBUFFER              : std_logic_vector(31 downto 0);
+    signal DSACK_In             : std_logic_vector(1 downto 0);
+    signal DSACK_MEM            : bit_vector(1 downto 0);
+    signal OCS_INH              : bit;
+    signal HALT_In              : bit;
+    signal HALTED               : bit;
+    signal NEXT_ARB_STATE       : ARB_STATES;
+    signal NEXT_BUS_CTRL_STATE  : BUS_CTRL_STATES;
+    signal OBUFFER              : std_logic_vector(15 downto 0);
+    signal OP_SIZE_I            : OP_SIZETYPE;
+    signal OPCODE_ACCESS        : bit;
+    signal OPCODE_RDY_I         : bit;
+    signal READ_ACCESS          : bit;
+    signal RESET_CPU_I          : bit;
+    signal RESET_OUT_I          : std_logic;
+    signal RETRY                : bit;
+    signal SIZE_D               : std_logic_vector(1 downto 0);
+    signal SIZE_I               : std_logic_vector(1 downto 0);
+    signal SIZE_N               : std_logic_vector(2 downto 0) := "000";
+    signal SLICE_CNT_N          : std_logic_vector(2 downto 0);
+    signal SLICE_CNT_P          : std_logic_vector(2 downto 0);
+    signal START_READ           : bit;
+    signal STERM_In             : std_logic;
+    signal T_SLICE              : TIME_SLICES;
+    signal WAITSTATES           : bit;
+    signal WP_BUFFER            : std_logic_vector(31 downto 0);
+    signal WRITE_ACCESS         : bit;
 begin
 
     START_READ <= '0' when SIZE_N /= "000" else -- Pending cycles.
@@ -431,9 +431,9 @@ begin
     end process BUS_CTRL_DEC;
 
     P_ADR_OFFS: process
-    -- This process provides a temporary address offset during
-    -- bus access over up to 16 bytes in case of burst filling.
-    variable OFFSET_VAR     : std_logic_vector(2 downto 0) := "000";
+        -- This process provides a temporary address offset during
+        -- bus access over up to 16 bytes in case of burst filling.
+        variable OFFSET_VAR     : std_logic_vector(2 downto 0) := "000";
     begin
         wait until CLK = '1' and CLK' event;
         if RESET_CPU_I = '1' then
@@ -601,8 +601,8 @@ begin
     end process IN_MUX;
 
     VALIDATION: process
-    -- These flip flops detect a fault during the read operation over one or
-    -- several bytes or during the write operation.
+        -- These flip flops detect a fault during the read operation over one or
+        -- several bytes or during the write operation.
     begin
         wait until CLK = '1' and CLK' event;
         --
@@ -626,12 +626,12 @@ begin
     end process VALIDATION;
 
     PREFETCH_BUFFERS: process
-    -- These are the data and the operation code input registers. After a last read to the registered
-    -- input multiplexer, the respective data is copied from the input multiplexer to these buffers.
-    -- The opcode buffer is always written with 32 bit data. The data buffers may contain invalid bytes
-    -- in case of word or byte data size.
-    variable DBUFFER_MEM    : std_logic_vector(31 downto 8) := x"000000";
-    variable RDY_VAR        : bit := '0';
+        -- These are the data and the operation code input registers. After a last read to the registered
+        -- input multiplexer, the respective data is copied from the input multiplexer to these buffers.
+        -- The opcode buffer is always written with 32 bit data. The data buffers may contain invalid bytes
+        -- in case of word or byte data size.
+        variable DBUFFER_MEM    : std_logic_vector(31 downto 8) := x"000000";
+        variable RDY_VAR        : bit := '0';
     begin
         wait until CLK = '1' and CLK' event;
         --

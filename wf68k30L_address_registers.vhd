@@ -14,7 +14,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright © 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.           ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -125,32 +125,32 @@ entity WF68K30L_ADDRESS_REGISTERS is
 end entity WF68K30L_ADDRESS_REGISTERS;
     
 architecture BEHAVIOR of WF68K30L_ADDRESS_REGISTERS is
-type AR_TYPE is array(0 to 6) of std_logic_vector(31 downto 0);
-signal ADR_EFF_I        : std_logic_vector(31 downto 0);
-signal ADR_EFF_OUTMUX   : std_logic_vector(31 downto 0);
-signal AR               : AR_TYPE; -- Address registers A0 to A6.
-signal AR_OUT_1_I       : std_logic_vector(31 downto 0);
-signal AR_OUT_2_I       : std_logic_vector(31 downto 0);
-signal ADR_WB           : std_logic_vector(32 downto 0);
-signal AR_PNTR_1        : integer range 0 to 7;
-signal AR_PNTR_2        : integer range 0 to 7;
-signal AR_PNTR_WB_1     : integer range 0 to 7;
-signal AR_PNTR_WB_2     : integer range 0 to 7;
-signal AR_USED_1        : std_logic_vector(3 downto 0);
-signal AR_USED_2        : std_logic_vector(3 downto 0);
-signal B_S              : std_logic := '0'; -- Base register suppress.
-signal BD_SIZE          : std_logic_vector(1 downto 0); -- Indexed / Indirect.
-signal DFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
-signal F_E              : std_logic; -- Full extension word.
-signal I_IS             : std_logic_vector(2 downto 0); -- Indexed / Indirect.
-signal I_S              : std_logic; -- Index suppress.
-signal ISP_REG          : std_logic_vector(31 downto 0); -- Interrupt stack pointer (refers to A7'' in the supervisor mode).
-signal MSBIT            : std_logic_vector(1 downto 0);
-signal MSP_REG          : std_logic_vector(31 downto 0); -- Master stack pointer (refers to A7' in the supervisor mode).
-signal PC_I             : std_logic_vector(31 downto 0); -- Active program counter.
-signal SCALE            : std_logic_vector(1 downto 0); -- Scale information for the index.
-signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
-signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
+    type AR_TYPE is array(0 to 6) of std_logic_vector(31 downto 0);
+    signal ADR_EFF_I        : std_logic_vector(31 downto 0);
+    signal ADR_EFF_OUTMUX   : std_logic_vector(31 downto 0);
+    signal AR               : AR_TYPE; -- Address registers A0 to A6.
+    signal AR_OUT_1_I       : std_logic_vector(31 downto 0);
+    signal AR_OUT_2_I       : std_logic_vector(31 downto 0);
+    signal ADR_WB           : std_logic_vector(32 downto 0);
+    signal AR_PNTR_1        : integer range 0 to 7;
+    signal AR_PNTR_2        : integer range 0 to 7;
+    signal AR_PNTR_WB_1     : integer range 0 to 7;
+    signal AR_PNTR_WB_2     : integer range 0 to 7;
+    signal AR_USED_1        : std_logic_vector(3 downto 0);
+    signal AR_USED_2        : std_logic_vector(3 downto 0);
+    signal B_S              : std_logic := '0'; -- Base register suppress.
+    signal BD_SIZE          : std_logic_vector(1 downto 0); -- Indexed / Indirect.
+    signal DFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
+    signal F_E              : std_logic; -- Full extension word.
+    signal I_IS             : std_logic_vector(2 downto 0); -- Indexed / Indirect.
+    signal I_S              : std_logic; -- Index suppress.
+    signal ISP_REG          : std_logic_vector(31 downto 0); -- Interrupt stack pointer (refers to A7'' in the supervisor mode).
+    signal MSBIT            : std_logic_vector(1 downto 0);
+    signal MSP_REG          : std_logic_vector(31 downto 0); -- Master stack pointer (refers to A7' in the supervisor mode).
+    signal PC_I             : std_logic_vector(31 downto 0); -- Active program counter.
+    signal SCALE            : std_logic_vector(1 downto 0); -- Scale information for the index.
+    signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
+    signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
 begin
     INBUFFER: process
     begin
@@ -225,21 +225,21 @@ begin
     ADDRESS_MODES: process(ADR_MODE, ADR_OFFSET, AMODE_SEL, AR, AR_IN_1, AR_PNTR_1, B_S, 
                            CLK, F_E, FETCH_MEM_ADR, I_S, I_IS, ISP_REG, MBIT, MSP_REG, 
                            PC_EW_OFFSET, PC_I, RESTORE_ISP_PC, SBIT, USE_DREG, USP_REG)
-    -- The effective address calculation takes place in this process depending on the 
-    -- selected addressing mode.
-    -- The PC address (PC_I) used for the address calculation points to the first
-    -- extension word used.
-    variable ABS_ADDRESS    : std_logic_vector(31 downto 0);
-    variable ADR_MUX    	: std_logic_vector(31 downto 0);
-    variable ADR_EFF_VAR    : std_logic_vector(31 downto 0);
-    variable ADR_EFF_VAR_P  : std_logic_vector(31 downto 0);
-    variable BASE_DISPL     : std_logic_vector(31 downto 0);
-    variable I_S_IS         : std_logic_vector(3 downto 0); 
-    variable INDEX      	: std_logic_vector(31 downto 0) := x"00000000";    
-    variable INDEX_SCALED   : std_logic_vector(31 downto 0);
-    variable MEM_ADR        : std_logic_vector(31 downto 0);
-    variable OUTER_DISPL    : std_logic_vector(31 downto 0);
-    variable PCVAR          : std_logic_vector(31 downto 0);
+        -- The effective address calculation takes place in this process depending on the 
+        -- selected addressing mode.
+        -- The PC address (PC_I) used for the address calculation points to the first
+        -- extension word used.
+        variable ABS_ADDRESS    : std_logic_vector(31 downto 0);
+        variable ADR_MUX    	: std_logic_vector(31 downto 0);
+        variable ADR_EFF_VAR    : std_logic_vector(31 downto 0);
+        variable ADR_EFF_VAR_P  : std_logic_vector(31 downto 0);
+        variable BASE_DISPL     : std_logic_vector(31 downto 0);
+        variable I_S_IS         : std_logic_vector(3 downto 0); 
+        variable INDEX      	: std_logic_vector(31 downto 0) := x"00000000";    
+        variable INDEX_SCALED   : std_logic_vector(31 downto 0);
+        variable MEM_ADR        : std_logic_vector(31 downto 0);
+        variable OUTER_DISPL    : std_logic_vector(31 downto 0);
+        variable PCVAR          : std_logic_vector(31 downto 0);
     begin
         I_S_IS := I_S & I_IS;        
         PCVAR := PC_I + PC_EW_OFFSET; -- This is the address of the extension word.
@@ -727,10 +727,10 @@ begin
     end process ADDRESS_REGISTERS;
 
     FCODES: process
-    -- These flip flops provide the alternate function
-    -- code registers.
-    variable SFC_REG : std_logic_vector(2 downto 0);
-    variable DFC_REG : std_logic_vector(2 downto 0);
+        -- These flip flops provide the alternate function
+        -- code registers.
+        variable SFC_REG : std_logic_vector(2 downto 0);
+        variable DFC_REG : std_logic_vector(2 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if DFC_WR = '1' then

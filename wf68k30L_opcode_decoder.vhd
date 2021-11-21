@@ -116,44 +116,44 @@ entity WF68K30L_OPCODE_DECODER is
 end entity WF68K30L_OPCODE_DECODER;
 
 architecture BEHAVIOR of WF68K30L_OPCODE_DECODER is
-type CAHR_STATUSTYPE is(FULL, EMPTY);
-type INSTR_LVL_TYPE is(D, B, C);
-type IPIPE_TYPE is
-    record
-        D       : std_logic_vector(15 downto 0);
-        C       : std_logic_vector(15 downto 0);
-        B       : std_logic_vector(15 downto 0);
-    end record;
+    type CAHR_STATUSTYPE is(FULL, EMPTY);
+    type INSTR_LVL_TYPE is(D, B, C);
+    type IPIPE_TYPE is
+        record
+            D       : std_logic_vector(15 downto 0);
+            C       : std_logic_vector(15 downto 0);
+            B       : std_logic_vector(15 downto 0);
+        end record;
 
-signal REQ                  : bit;
+    signal REQ                  : bit;
 
-signal CAHR                 : std_logic_vector(15 downto 0);
-signal CAHR_REQ             : bit;
-signal CAHR_FAULT           : std_logic;
-signal CAHR_STATUS          : CAHR_STATUSTYPE;
+    signal CAHR                 : std_logic_vector(15 downto 0);
+    signal CAHR_REQ             : bit;
+    signal CAHR_FAULT           : std_logic;
+    signal CAHR_STATUS          : CAHR_STATUSTYPE;
 
-signal EW_REQ               : bit;
+    signal EW_REQ               : bit;
 
-signal IPIPE                : IPIPE_TYPE;
-signal FIFO_RD              : bit;
-signal IPIPE_B_FAULT        : std_logic;
-signal IPIPE_C_FAULT        : std_logic;
-signal IPIPE_D_FAULT        : std_logic;
-signal IPIPE_PNTR           : natural range 0 to 3;
+    signal IPIPE                : IPIPE_TYPE;
+    signal FIFO_RD              : bit;
+    signal IPIPE_B_FAULT        : std_logic;
+    signal IPIPE_C_FAULT        : std_logic;
+    signal IPIPE_D_FAULT        : std_logic;
+    signal IPIPE_PNTR           : natural range 0 to 3;
 
-signal INSTR_LVL            : INSTR_LVL_TYPE;
+    signal INSTR_LVL            : INSTR_LVL_TYPE;
 
-signal BKPT_REQ             : bit;
+    signal BKPT_REQ             : bit;
 
-signal OP_I                 : OP_68K;
+    signal OP_I                 : OP_68K;
 
-signal OPCODE_RD_I          : bit;
-signal OW_REQ               : bit;
+    signal OPCODE_RD_I          : bit;
+    signal OW_REQ               : bit;
 
-signal TRAP_CODE_I          : TRAPTYPE_OPC;
-signal FLUSHED              : boolean;
-signal PC_INC_I             : bit;
-signal PIPE_RDY             : bit;
+    signal TRAP_CODE_I          : TRAPTYPE_OPC;
+    signal FLUSHED              : boolean;
+    signal PC_INC_I             : bit;
+    signal PIPE_RDY             : bit;
 begin
     P_BSY: process(BUSY_EXH, CLK, IPIPE_FLUSH, OPCODE_RDY)
     -- This logic requires asynchronous reset. This flip flop is intended 
@@ -210,11 +210,11 @@ begin
     end process P_CAHR;
 
     INSTRUCTION_PIPE: process
-    -- These are the instruction pipe FIFO registers. The opcodes are stored in IPIPE.B, IPIPE.C
-    -- and IPIPE.D which is copied to the instruction register or to the respective extension when
-    -- read. Be aware, that the pipe is always completely refilled to determine the correct INSTR_LVL
-    -- before it is copied to the execution unit.
-    variable IPIPE_D_VAR    : std_logic_vector(15 downto 0);
+        -- These are the instruction pipe FIFO registers. The opcodes are stored in IPIPE.B, IPIPE.C
+        -- and IPIPE.D which is copied to the instruction register or to the respective extension when
+        -- read. Be aware, that the pipe is always completely refilled to determine the correct INSTR_LVL
+        -- before it is copied to the execution unit.
+        variable IPIPE_D_VAR    : std_logic_vector(15 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if IPIPE_FLUSH = '1' then
@@ -394,9 +394,9 @@ begin
     end process INSTRUCTION_PIPE;
 
     P_FAULT: process
-    -- This are the fault flags for pipe B and C.
-    -- These flags are set, when an instruction
-    -- request uses either of the respective pipes.
+        -- This are the fault flags for pipe B and C.
+        -- These flags are set, when an instruction
+        -- request uses either of the respective pipes.
     begin
         wait until CLK = '1' and CLK' event;
         if IPIPE_FLUSH = '1' then
@@ -435,7 +435,7 @@ begin
     end process P_FAULT;
 
     OUTBUFFERS: process
-    variable OP_STOP    : boolean;
+        variable OP_STOP    : boolean;
     begin
         wait until CLK = '1' and CLK' event;
         if OP_STOP = true and IPIPE_FLUSH = '1' then
@@ -477,10 +477,10 @@ begin
                 '1' when EW_REQ = '1' and IPIPE_PNTR > 0 else '0';
  
     HANDSHAKING: process
-    -- Wee need these flip flops to ensure, that the OUTBUFFERS are
-    -- written when the respecktive _ACK signal is asserted.
-    -- The breakpoint cycles are valid for one word operations and
-    -- therefore does never start FPU operations.
+        -- Wee need these flip flops to ensure, that the OUTBUFFERS are
+        -- written when the respecktive _ACK signal is asserted.
+        -- The breakpoint cycles are valid for one word operations and
+        -- therefore does never start FPU operations.
     begin
         wait until CLK = '1' and CLK' event;
         if EW_REQ = '1' and IPIPE_PNTR /= 0 then
@@ -501,17 +501,17 @@ begin
     end process HANDSHAKING;
 
     P_PC_OFFSET: process(CLK, PC_INC_EXH, PC_INC_I)
-    -- Be Aware: the ADR_OFFSET requires the 'old' PC_VAR.
-    -- To arrange this, the ADR_OFFSET logic is located
-    -- above the PC_VAR logic. Do not change this!
-    -- The PC_VAR is modeled in a way, that the PC points
-    -- always to the BIW_0.
-    -- The PC_EW_OFFSET is also used for the calculation 
-    -- of the correct PC value written to the stack pointer
-    -- during BSR, JSR and exceptions.
-    variable ADR_OFFSET     : std_logic_vector(6 downto 0);
-    variable PC_VAR         : std_logic_vector(6 downto 0);
-    variable PC_VAR_MEM     : std_logic_vector(6 downto 0);
+        -- Be Aware: the ADR_OFFSET requires the 'old' PC_VAR.
+        -- To arrange this, the ADR_OFFSET logic is located
+        -- above the PC_VAR logic. Do not change this!
+        -- The PC_VAR is modeled in a way, that the PC points
+        -- always to the BIW_0.
+        -- The PC_EW_OFFSET is also used for the calculation 
+        -- of the correct PC value written to the stack pointer
+        -- during BSR, JSR and exceptions.
+        variable ADR_OFFSET     : std_logic_vector(6 downto 0);
+        variable PC_VAR         : std_logic_vector(6 downto 0);
+        variable PC_VAR_MEM     : std_logic_vector(6 downto 0);
     begin
         if CLK = '1' and CLK' event then
             if IPIPE_FLUSH = '1' then

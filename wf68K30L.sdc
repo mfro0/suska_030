@@ -1,5 +1,5 @@
 #                                                             
-# Copyright © 2014 Wolfgang Foerster Inventronik GmbH.        
+# Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.        
 #                                                             
 # This documentation describes Open Hardware and is licensed  
 # under the CERN OHL v. 1.2. You may redistribute and modify  
@@ -29,7 +29,12 @@
 #**************************************************************
 
 # create_clock -name CLK -period 100.000 -waveform {0.000 50.000} [get_ports {CLK}]
-create_clock -period 32.000 -name CLK [get_ports {CLK}]
+create_clock -period 33.000 -name CLK [get_ports {CLK}]
+
+set_input_delay -clock CLK -min 1.0 [all_inputs]
+set_input_delay -clock CLK -max 1.0 [all_inputs]
+set_output_delay -clock CLK -min 1.0 [all_outputs]
+set_output_delay -clock CLK -max 2.0 [all_outputs]
 
 #derive_pll_clocks
 #derive_pll_clocks -use_net_name

@@ -151,40 +151,40 @@ type EX_STATES is (IDLE, BUILD_STACK, BUILD_TSTACK, CALC_VECT_No, EXAMINE_VERSIO
 type EXCEPTIONS is (EX_NONE, EX_1010, EX_1111, EX_AERR, EX_BERR, EX_CHK, EX_DIVZERO, EX_FORMAT, EX_ILLEGAL,
                     EX_INT, EX_PRIV, EX_RESET, EX_RTE, EX_TRACE, EX_TRAP, EX_TRAPcc, EX_TRAPV);
 
-signal BUSY_EXH_I           : bit;
-signal DATA_RD_I            : bit;
-signal DATA_WR_I            : bit;
-signal DOUBLE_BUSFLT        : bit;
-signal EXCEPTION            : EXCEPTIONS; -- Currently executed exception.
-signal EX_STATE             : EX_STATES := IDLE;
-signal NEXT_EX_STATE        : EX_STATES;
-signal EX_P_1010            : bit; -- ..._P are the pending exceptions.
-signal EX_P_1111            : bit;
-signal EX_P_AERR            : bit;
-signal EX_P_BERR            : bit;
-signal EX_P_CHK             : bit;
-signal EX_P_DIVZERO         : bit;
-signal EX_P_FORMAT          : bit;
-signal EX_P_ILLEGAL         : bit;
-signal EX_P_INT             : bit;
-signal EX_P_RESET           : bit;
-signal EX_P_RTE             : bit;
-signal EX_P_PRIV            : bit;
-signal EX_P_TRACE           : bit;
-signal EX_P_TRAP            : bit;
-signal EX_P_TRAPcc          : bit;
-signal EX_P_TRAPV           : bit;
-signal IBOUND               : boolean;
-signal IRQ                  : std_logic_vector(2 downto 0);
-signal MBIT                 : std_logic;
-signal PIPE_CNT             : std_logic_vector(1 downto 0);
-signal PIPE_FULL            : boolean;
-signal SSW_FCODE            : std_logic_vector(2 downto 0);
-signal SSW_RW               : std_logic;
-signal SSW_SIZE             : std_logic_vector(1 downto 0);
-signal STACK_CNT            : integer range 0 to 46;
-signal STACK_FORMAT_I       : std_logic_vector(3 downto 0);
-signal SYS_INIT             : bit;
+    signal BUSY_EXH_I           : bit;
+    signal DATA_RD_I            : bit;
+    signal DATA_WR_I            : bit;
+    signal DOUBLE_BUSFLT        : bit;
+    signal EXCEPTION            : EXCEPTIONS; -- Currently executed exception.
+    signal EX_STATE             : EX_STATES := IDLE;
+    signal NEXT_EX_STATE        : EX_STATES;
+    signal EX_P_1010            : bit; -- ..._P are the pending exceptions.
+    signal EX_P_1111            : bit;
+    signal EX_P_AERR            : bit;
+    signal EX_P_BERR            : bit;
+    signal EX_P_CHK             : bit;
+    signal EX_P_DIVZERO         : bit;
+    signal EX_P_FORMAT          : bit;
+    signal EX_P_ILLEGAL         : bit;
+    signal EX_P_INT             : bit;
+    signal EX_P_RESET           : bit;
+    signal EX_P_RTE             : bit;
+    signal EX_P_PRIV            : bit;
+    signal EX_P_TRACE           : bit;
+    signal EX_P_TRAP            : bit;
+    signal EX_P_TRAPcc          : bit;
+    signal EX_P_TRAPV           : bit;
+    signal IBOUND               : boolean;
+    signal IRQ                  : std_logic_vector(2 downto 0);
+    signal MBIT                 : std_logic;
+    signal PIPE_CNT             : std_logic_vector(1 downto 0);
+    signal PIPE_FULL            : boolean;
+    signal SSW_FCODE            : std_logic_vector(2 downto 0);
+    signal SSW_RW               : std_logic;
+    signal SSW_SIZE             : std_logic_vector(1 downto 0);
+    signal STACK_CNT            : integer range 0 to 46;
+    signal STACK_FORMAT_I       : std_logic_vector(3 downto 0);
+    signal SYS_INIT             : bit;
 begin
     BUSY_EXH <= BUSY_EXH_I;
     BUSY_EXH_I <= '0' when EX_STATE = WAIT_RMC else
@@ -223,13 +223,13 @@ begin
     end process INSTRUCTION_BOUNDARY;
     
     PENDING: process
-    -- The exceptions which occurs are stored in this pending register until the
-    -- interrupt handler handled the respective exception.
-    -- The TRAP_PRIV, TRAP_1010, TRAP_1111, TRAP_ILLEGAL, TRAP_OP and TRAP_V may be a strobe
-    -- of 1 clock period. All others must be strobes of 1 clock period..
-    variable INT7_TRIG  : boolean;
-    variable INT_VAR    : std_logic_vector(2 downto 0);
-    variable SR_VAR     : std_logic_vector(2 downto 0);
+        -- The exceptions which occurs are stored in this pending register until the
+        -- interrupt handler handled the respective exception.
+        -- The TRAP_PRIV, TRAP_1010, TRAP_1111, TRAP_ILLEGAL, TRAP_OP and TRAP_V may be a strobe
+        -- of 1 clock period. All others must be strobes of 1 clock period..
+        variable INT7_TRIG  : boolean;
+        variable INT_VAR    : std_logic_vector(2 downto 0);
+        variable SR_VAR     : std_logic_vector(2 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if RESET_CPU = '1' then
@@ -362,11 +362,11 @@ begin
     IPENDn <= '0' when EX_P_INT = '1' or EX_P_RESET = '1' or EX_P_TRACE = '1' else '1';
 
     INT_VECTOR: process
-    -- This process provides the vector base register handling and 
-    -- the interrupt vector number INT_VECT, which is determined 
-    -- during interrupt processing.
-    variable VECT_No    : std_logic_vector(9 downto 2) := "00000000";
-    variable VB_REG     : std_logic_vector(31 downto 0) := x"00000000";
+        -- This process provides the vector base register handling and 
+        -- the interrupt vector number INT_VECT, which is determined 
+        -- during interrupt processing.
+        variable VECT_No    : std_logic_vector(9 downto 2) := "00000000";
+        variable VB_REG     : std_logic_vector(31 downto 0) := x"00000000";
     begin
         wait until CLK = '1' and CLK' event;
         if VBR_WR = '1' then
@@ -416,10 +416,10 @@ begin
     end process INT_VECTOR;
 
     STORE_CURRENT_EXCEPTION: process
-    -- The exceptions which occurs are stored in the following flags until the
-    -- interrupt handler handled the respective exception.
-    -- This process also stores the current processed exception for further use. 
-    -- The update takes place in the IDLE EX_STATE.
+        -- The exceptions which occurs are stored in the following flags until the
+        -- interrupt handler handled the respective exception.
+        -- This process also stores the current processed exception for further use. 
+        -- The update takes place in the IDLE EX_STATE.
     begin
         wait until CLK = '1' and CLK' event;
         -- Priority level 0:
@@ -620,11 +620,11 @@ begin
     end process P_SSW;
 
     STACK_CTRL: process
-    -- This process controls the stacking of the data to the stack. Depending
-    -- on the stack frame format, the number of words written to the stack is 
-    -- adjusted to long words. See the DATA_2_PORT multiplexer in the top level
-    -- file for more information.
-    variable STACK_POS_VAR  : integer range 0 to 46 := 0;
+        -- This process controls the stacking of the data to the stack. Depending
+        -- on the stack frame format, the number of words written to the stack is 
+        -- adjusted to long words. See the DATA_2_PORT multiplexer in the top level
+        -- file for more information.
+        variable STACK_POS_VAR  : integer range 0 to 46 := 0;
     begin
         wait until CLK = '1' and CLK' event;
         if EX_STATE /= BUILD_TSTACK and NEXT_EX_STATE = BUILD_TSTACK then
@@ -693,12 +693,12 @@ begin
     end process REFILL_LOGIC;
 
     P_STATUSn : process
-    -- This logic asserts the STATUSn permanently when the CPU is halted.
-    -- STATUSn is asserted for three clock cycles when the exception
-    -- processing starts for RESET, BERR, AERR, 1111, spurious inter-
-    -- rupt and autovectored interrupt. And for TRACE or external
-    -- interrupt exception it is asserted for two clock cycles.
-    variable CNT    : std_logic_vector(1 downto 0);
+        -- This logic asserts the STATUSn permanently when the CPU is halted.
+        -- STATUSn is asserted for three clock cycles when the exception
+        -- processing starts for RESET, BERR, AERR, 1111, spurious inter-
+        -- rupt and autovectored interrupt. And for TRACE or external
+        -- interrupt exception it is asserted for two clock cycles.
+        variable CNT    : std_logic_vector(1 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if EX_STATE = CALC_VECT_No then
@@ -724,10 +724,10 @@ begin
     end process P_STATUSn;
 
     PIPE_STATUS: process
-    -- This logic detects the status of the
-    -- instruction pipe prefetch in the 
-    -- REFILL_PIPE state.
-    variable CNT : std_logic_vector(1 downto 0);
+        -- This logic detects the status of the
+        -- instruction pipe prefetch in the 
+        -- REFILL_PIPE state.
+        variable CNT : std_logic_vector(1 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if EX_STATE /= REFILL_PIPE then

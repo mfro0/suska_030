@@ -12,7 +12,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright © 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.           ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -66,16 +66,16 @@ entity WF68K30L_DATA_REGISTERS is
 end entity WF68K30L_DATA_REGISTERS;
     
 architecture BEHAVIOUR of WF68K30L_DATA_REGISTERS is
-type DR_TYPE is array(0 to 7) of std_logic_vector(31 downto 0);
-signal DR               : DR_TYPE; -- Data registers D0 to D7.
-signal DR_PNTR_WR_1     : integer range 0 to 7;
-signal DR_PNTR_WR_2     : integer range 0 to 7;
-signal DR_PNTR_RD_1     : integer range 0 to 7;
-signal DR_PNTR_RD_2     : integer range 0 to 7;
-signal DR_SEL_WR_I1     : std_logic_vector(2 downto 0);
-signal DR_SEL_WR_I2     : std_logic_vector(2 downto 0);
-signal DR_USED_1        : std_logic_vector(3 downto 0);
-signal DR_USED_2        : std_logic_vector(3 downto 0);
+    type DR_TYPE is array(0 to 7) of std_logic_vector(31 downto 0);
+    signal DR               : DR_TYPE; -- Data registers D0 to D7.
+    signal DR_PNTR_WR_1     : integer range 0 to 7;
+    signal DR_PNTR_WR_2     : integer range 0 to 7;
+    signal DR_PNTR_RD_1     : integer range 0 to 7;
+    signal DR_PNTR_RD_2     : integer range 0 to 7;
+    signal DR_SEL_WR_I1     : std_logic_vector(2 downto 0);
+    signal DR_SEL_WR_I2     : std_logic_vector(2 downto 0);
+    signal DR_USED_1        : std_logic_vector(3 downto 0);
+    signal DR_USED_2        : std_logic_vector(3 downto 0);
 begin
     INBUFFER: process
     begin
