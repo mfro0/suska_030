@@ -12,6 +12,8 @@ package utils is
     function to_hstring(value  : std_ulogic_vector) return string;
     function to_hstring(value : natural) return string;
     function to_hstring(value : unsigned) return string;
+    type memarray is array(integer range <>) of std_ulogic_vector;
+    procedure hdump(mem : memarray);
 end package utils;
 
 
@@ -94,4 +96,11 @@ package body utils is
     begin
         return to_hstring(std_ulogic_vector(value));
     end function to_hstring;
+
+    procedure hdump(mem : memarray) is
+    begin
+        for i in 0 to mem'length - 1 loop
+            report "mem(" & integer'image(i) & ") = " & to_hstring(mem(i)) severity note;
+        end loop;
+    end hdump;
 end package body utils;

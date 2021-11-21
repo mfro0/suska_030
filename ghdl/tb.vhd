@@ -1,7 +1,9 @@
 library ieee;
 use ieee.numeric_std.all;
 use ieee.std_logic_1164.all;
-use work.utils.all;
+use work.utils.memarray;
+use work.utils.hdump;
+use std.textio.all;
 
 entity tb is
 end entity tb;
@@ -9,19 +11,26 @@ end entity tb;
 architecture sim of tb is
     signal clk_25               : std_ulogic := '1';
 
-    type mem_array is array(natural range <>) of std_ulogic_vector(31 downto 0);
-    constant memstart           : mem_array :=
-    (
-        -- initial PC
-        std_ulogic_vector(unsigned'(x"00000010")),
-        -- initial SP
-        std_ulogic_vector(unsigned'(x"00000080"))
-    ); 
+    function to32(a : work.m68k_rom.ubyte_array) return memarray is
+        variable res : memarray(0 to (a'length + 4) / 4)(31 downto 0);
+        variable last32 : std_ulogic_vector(31 downto 0);
+    begin
+        for i in 0 to res'length - 3 loop
+            res(i) := a(4 * i + 0) & a(4 * i + 1) & a(4 * i + 2) & a(4 * i + 3);
+        end loop;
+        last32 := (others => '0');
+        for i in a'length mod 4 to 3 loop
+            last32 := last32 or std_ulogic_vector(resize(shift_left(unsigned(a(i * 8)), i mod 4), 32));
+        end loop;
 
-    signal memory               : mem_array(0 to 100) := 
+        res(res'length - 1) := last32;
+
+        return res;
+    end function to32;
+
+    signal memory               : memarray(0 to 100)(31 downto 0) := 
     (
-        -- set initial PC and initial SP in memory
-        0 to 1 => memstart(0 to 1),
+        0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => std_ulogic_vector(unsigned'(x"4e714e71"))
     );
 
@@ -70,12 +79,14 @@ begin
     p_read : process(all)
         variable adr : integer;
     begin
+        dsack_n <= (others => 'Z');
         adr := to_integer(unsigned(adr_out)) / 4;
         
         if rising_edge(clk_25) then
             if rw_n = '1' then
                 if adr >= memory'low and adr <= memory'high then
                     data_in <= memory(adr);
+                    dsack_n <= (others => '0');           -- indicate 32 bit port size
                 end if;
             end if;
         end if;

@@ -1,28 +1,46 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sun Nov 21 09:31:04 2021
+[*] Sun Nov 21 10:26:11 2021
 [*]
 [dumpfile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.vcd"
-[dumpfile_mtime] "Sun Nov 21 09:27:40 2021"
-[dumpfile_size] 172032
+[dumpfile_mtime] "Sun Nov 21 10:25:20 2021"
+[dumpfile_size] 1089536
 [savefile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.gtkw"
-[timestart] 0
+[timestart] 23000000000
 [size] 1920 1016
-[pos] -301 -301
-*-27.744219 146000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-27.744219 22320000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb.
+[treeopen] tb.i_m68030.
 [sst_width] 228
-[signals_width] 149
+[signals_width] 225
 [sst_expanded] 1
 [sst_vpaned_height] 286
 @28
 tb.clk_25
 tb.reset_n
-tb.reset_n_out
+tb.halt_n
+tb.berr_n
+@23
+tb.i_m68030.pc[31:0]
 @22
 tb.adr_out[31:0]
+tb.data_in[31:0]
 @28
+tb.rw_n
 tb.size_n[1:0]
-@29
-tb.as_n
+tb.ecs_n
+tb.ocs_n
+tb.reset_n_out
+tb.bg_n
+tb.bgack_n
+tb.br_n
+tb.bus_en
+tb.data_en
+@22
+tb.data_out[31:0]
+@28
+tb.dben_n
+tb.dsack_n[1:0]
 [pattern_trace] 1
 [pattern_trace] 0
