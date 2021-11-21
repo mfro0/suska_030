@@ -1,0 +1,28 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sun Nov 21 09:31:04 2021
+[*]
+[dumpfile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.vcd"
+[dumpfile_mtime] "Sun Nov 21 09:27:40 2021"
+[dumpfile_size] 172032
+[savefile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.gtkw"
+[timestart] 0
+[size] 1920 1016
+[pos] -301 -301
+*-27.744219 146000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 228
+[signals_width] 149
+[sst_expanded] 1
+[sst_vpaned_height] 286
+@28
+tb.clk_25
+tb.reset_n
+tb.reset_n_out
+@22
+tb.adr_out[31:0]
+@28
+tb.size_n[1:0]
+@29
+tb.as_n
+[pattern_trace] 1
+[pattern_trace] 0
