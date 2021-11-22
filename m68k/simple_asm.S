@@ -7,12 +7,15 @@
 
                 .org    0
 
+                .text
 _start:         .long   initialstack
                 .long   initialpc
 
 initialpc:
-loop:           lea     hello_world,%sp
+                lea     initialstack,sp
+loop:           pea     hello_world
                 bsr     _puts
+                addq.l  #4,sp
                 bra.s   loop
 
 
@@ -24,6 +27,6 @@ hello_world:
 
                 .bss
                 .even
-stack:          .ds.l   0x10
+stack:          .ds.l   0x200
 initialstack:
 

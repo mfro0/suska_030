@@ -7,7 +7,7 @@ OBJDUMP=m68k-atari-mint-objdump
 SRCS=simple_asm.S \
      puts.c
 
-CFLAGS=-Wall -Os -fomit-frame-pointer -nostdlib -ffreestanding -nostartfiles
+CFLAGS=-Wall -O2 -fomit-frame-pointer -nostdlib -ffreestanding -nostartfiles
 LDFLAGS=-Wl,-Map -Wl,mapfile -Wl,--oformat -Wl,srec -Wl,-T simple.lk
 
 all: simple_asm.o puts.o
