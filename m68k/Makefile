@@ -1,16 +1,18 @@
 
 CC=m68k-atari-mint-gcc
 OBJCOPY=m68k-atari-mint-objcopy
+NOBJCOPY=objcopy
 OBJDUMP=m68k-atari-mint-objdump
 
 SRCS=simple_asm.S \
      puts.c
 
 CFLAGS=-Wall -Os -fomit-frame-pointer -nostdlib -ffreestanding -nostartfiles
-LDFLAGS=-Wl,-Map -Wl,mapfile -Wl,-bbinary -Wl,-T simple.lk
+LDFLAGS=-Wl,-Map -Wl,mapfile -Wl,--oformat -Wl,srec -Wl,-T simple.lk
 
 all: simple_asm.o puts.o
-	$(CC) $(LDFLAGS) $(CFLAGS) -Osrec -o simple.bin $^
+	$(CC) $(LDFLAGS) $(CFLAGS) -o simple.srec $^
+	$(NOBJCOPY) -I srec -O binary simple.srec simple.bin
 
 .PHONY: clean
 clean:
