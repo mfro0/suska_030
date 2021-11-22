@@ -1,4 +1,5 @@
 GHDLFLAGS = --std=08 -fsynopsys
+GHDL_RUNFLAGS = --ieee-asserts=disable
 GHDL = ghdl
 
 VPATH=..
@@ -33,6 +34,9 @@ tb: tb.o code
 %.o: %.vhd
 	$(GHDL) -a $(GHDLFLAGS) $<
 
+.PHONY: run
+run: tb
+	./tb $(GHDL_RUNFLAGS) --vcd=tb.vcd
 .PHONY: clean
 clean:
 	rm $(TG68_OBJS) tb
