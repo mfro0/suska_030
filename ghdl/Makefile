@@ -4,6 +4,7 @@ GHDL = ghdl
 VPATH=..
 
 TG68_OBJS = \
+	wf68k30L_pkg.o \
 	wf68k30L_address_registers.o  \
 	wf68k30L_alu.o  \
 	wf68k30L_bus_interface.o \
@@ -11,7 +12,6 @@ TG68_OBJS = \
 	wf68k30L_data_registers.o \
 	wf68k30L_exception_handler.o \
 	wf68k30L_opcode_decoder.o \
-	wf68k30L_pkg.o \
 	wf68k30L_top.o \
 	simple.o \
 	utils.o \
