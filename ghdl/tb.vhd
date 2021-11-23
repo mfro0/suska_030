@@ -110,9 +110,11 @@ begin
                     if rw_n = '0' then                      -- write cycle
                         if dben_n = '0' then
                             cs(1) := character'val(to_integer(unsigned(data_out(7 downto 0))));
-                            write(l, cs);
                             if cs(1) = LF then
+                                -- we only pass the CR through
                                 writeline(OUTPUT, l);
+                            else
+                                write(l, cs);
                             end if;
                             dsack_n <= (others => '0');
                             --report l.all severity note;
