@@ -8,12 +8,15 @@ package utils is
     function to_string(value : std_ulogic_vector) return string;
     function to_string(value : natural) return string;
     function to_string(value : unsigned) return string;
-    
+
     function to_hstring(value  : std_ulogic_vector) return string;
     function to_hstring(value : natural) return string;
     function to_hstring(value : unsigned) return string;
     type memarray is array(integer range <>) of std_ulogic_vector;
     procedure hdump(mem : memarray);
+
+    type stackdisplay is array(-5 to 5) of std_ulogic_vector(31 downto 0);
+
 end package utils;
 
 
@@ -27,10 +30,10 @@ package body utils is
             result(RESULT_LENGTH - i) := character'val((v mod 10) + character'pos('0'));
             v := v / 10;
         end loop;
-        
+
         return result;
     end function to_string;
-    
+
     function to_string(value : natural) return string is
         constant WIDTH          : integer := integer(ceil(log2(real(integer'high))));
         variable uns            : unsigned(WIDTH - 1 downto 0) := (others => '0');
@@ -38,12 +41,12 @@ package body utils is
         uns := to_unsigned(value, uns'length);
         return to_string(std_ulogic_vector(uns));
     end function to_string;
-    
+
     function to_string(value : unsigned) return string is
     begin
         return to_string(std_ulogic_vector(value));
     end function to_string;
-    
+
     -- stolen from VHDL 2008 ieee original
     function to_hstring(value  : std_ulogic_vector) return string is
         constant RESULT_LENGTH  : natural := (value'length + 3) / 4;
@@ -91,7 +94,7 @@ package body utils is
         uns := to_unsigned(value, uns'length);
         return to_hstring(std_ulogic_vector(uns));
     end function to_hstring;
-    
+
     function to_hstring(value : unsigned) return string is
     begin
         return to_hstring(std_ulogic_vector(value));

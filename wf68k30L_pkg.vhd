@@ -20,12 +20,12 @@
 ---- applicable conditions                                          ----
 ----                                                                ----
 ------------------------------------------------------------------------
--- 
+--
 -- Revision History
--- 
+--
 -- Revision 2K14B 20141201 WF
 --   Initial Release.
--- 
+--
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -34,13 +34,13 @@ package WF68K30L_PKG is
 type OP_SIZETYPE is (LONG, WORD, BYTE);
 -- The OPCODES AND, NOT, OR, ROR and ROL are defined keywords in VHDL. Therefore the assignment is
 -- AND_B, NOT_B, OR_B, ROTR and ROTL.
-type OP_68K is (ABCD, ADD, ADDA, ADDI, ADDQ, ADDX, AND_B, ANDI, ANDI_TO_CCR, ANDI_TO_SR, ASL, ASR, Bcc, BCHG, BCLR, 
-                BFCHG, BFCLR, BFEXTS, BFEXTU, BFFFO, BFINS, BFSET, BFTST, BKPT, BRA, BSET, BSR, BTST, CAS, CAS2, 
-                CHK, CHK2, CLR, CMP, CMP2, CMPA, CMPI, CMPM, CPUSH, DBcc, DIVS, DIVU, EOR, EORI, EORI_TO_CCR, 
-                EORI_TO_SR, EXG, EXT, EXTB, ILLEGAL, JMP, JSR, LEA, LINK, LSL, LSR, MOVE, MOVE_FROM_CCR, MOVE_TO_CCR, 
-                MOVE_FROM_SR, MOVE_TO_SR, MOVE_USP, MOVEA, MOVEC, MOVEM, MOVEP, MOVEQ, MOVES, MULS, MULU, NBCD, NEG, 
-                NEGX, NOP, NOT_B, OR_B, ORI, ORI_TO_CCR, ORI_TO_SR, PACK, PEA, RESET, ROTL, ROTR, ROXL, ROXR, RTD, 
-                RTE, RTR, RTS, SBCD, Scc, STOP, SUB, SUBA, SUBI, SUBQ, SUBX, SWAP, TAS, TRAP, TRAPcc, TRAPV, TST, 
+type OP_68K is (ABCD, ADD, ADDA, ADDI, ADDQ, ADDX, AND_B, ANDI, ANDI_TO_CCR, ANDI_TO_SR, ASL, ASR, Bcc, BCHG, BCLR,
+                BFCHG, BFCLR, BFEXTS, BFEXTU, BFFFO, BFINS, BFSET, BFTST, BKPT, BRA, BSET, BSR, BTST, CAS, CAS2,
+                CHK, CHK2, CLR, CMP, CMP2, CMPA, CMPI, CMPM, CPUSH, DBcc, DIVS, DIVU, EOR, EORI, EORI_TO_CCR,
+                EORI_TO_SR, EXG, EXT, EXTB, ILLEGAL, JMP, JSR, LEA, LINK, LSL, LSR, MOVE, MOVE_FROM_CCR, MOVE_TO_CCR,
+                MOVE_FROM_SR, MOVE_TO_SR, MOVE_USP, MOVEA, MOVEC, MOVEM, MOVEP, MOVEQ, MOVES, MULS, MULU, NBCD, NEG,
+                NEGX, NOP, NOT_B, OR_B, ORI, ORI_TO_CCR, ORI_TO_SR, PACK, PEA, RESET, ROTL, ROTR, ROXL, ROXR, RTD,
+                RTE, RTR, RTS, SBCD, Scc, STOP, SUB, SUBA, SUBI, SUBQ, SUBX, SWAP, TAS, TRAP, TRAPcc, TRAPV, TST,
                 UNLK, UNPK, UNIMPLEMENTED);
 
 type TRAPTYPE_OPC is(NONE, T_1010, T_1111, T_ILLEGAL, T_TRAP, T_PRIV); -- None is the first entry and default.
@@ -113,7 +113,8 @@ component WF68K30L_ADDRESS_REGISTERS
         PC_INC              : in bit;
         PC_LOAD             : in bit;
         PC_RESTORE          : in bit;
-        PC_OFFSET           : in std_logic_vector(7 downto 0)
+        PC_OFFSET           : in std_logic_vector(7 downto 0);
+        sp                  : out std_ulogic_vector(31 downto 0)
     );
 end component;
 
@@ -160,7 +161,7 @@ component WF68K30L_BUS_INTERFACE
         ADR_OUT_P           : out std_logic_vector(31 downto 0);
         FC_IN               : in std_logic_vector(2 downto 0);
         FC_OUT              : out std_logic_vector(2 downto 0);
-        DATA_PORT_IN        : in std_logic_vector(31 downto 0); 
+        DATA_PORT_IN        : in std_logic_vector(31 downto 0);
         DATA_PORT_OUT       : out std_logic_vector(31 downto 0);
         DATA_FROM_CORE      : in std_logic_vector(31 downto 0);
         DATA_TO_CORE        : out std_logic_vector(31 downto 0);
@@ -409,7 +410,7 @@ component WF68K30L_EXCEPTION_HANDLER
         TRAP_V              : in bit;
         EX_TRACE_IN         : in bit;
         VBR_WR              : in bit;
-        VBR                 : out std_logic_vector(31 downto 0)     
+        VBR                 : out std_logic_vector(31 downto 0)
     );
 end component;
 

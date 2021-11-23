@@ -37,12 +37,12 @@
 ---- applicable conditions                                          ----
 ----                                                                ----
 ------------------------------------------------------------------------
--- 
+--
 -- Revision History
--- 
+--
 -- Revision 2K14B 20141201 WF
 --   Initial Release.
--- 
+--
 
 library work;
 use work.WF68K30L_PKG.all;
@@ -53,10 +53,10 @@ use ieee.std_logic_unsigned.all;
 
 entity WF68K30L_TOP is
     generic(VERSION     : std_logic_vector(15 downto 0) := x"1402"); -- CPU version number.
-    port 
+    port
     (
         CLK             : in std_logic;
-        
+
         -- Address and data:
         ADR_OUT         : out std_logic_vector(31 downto 0);
         DATA_IN         : in std_logic_vector(31 downto 0);
@@ -69,10 +69,10 @@ entity WF68K30L_TOP is
         RESET_OUT       : out std_logic; -- Open drain.
         HALT_INn        : in std_logic;
         HALT_OUTn       : out std_logic; -- Open drain.
-        
+
         -- Processor status:
         FC_OUT          : out std_logic_vector(2 downto 0);
-        
+
         -- Interrupt control:
         AVECn           : in std_logic;
         IPLn            : in std_logic_vector(2 downto 0);
@@ -100,10 +100,13 @@ entity WF68K30L_TOP is
         -- Bus arbitration control:
         BRn             : in std_logic;
         BGn             : out std_logic;
-        BGACKn          : in std_logic
+        BGACKn          : in std_logic;
+
+        -- debugging
+        sp              : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_TOP;
-    
+
 architecture STRUCTURE of WF68K30L_TOP is
     signal ADn                      : bit;
     signal ADR_ATN                  : bit;
@@ -408,7 +411,7 @@ begin
                       ALU_RESULT(31 downto 0);
 
     AR_DEC <= AR_DEC_MAIN or AR_DEC_EXH;
- 
+
     AR_SEL_RD_1 <= "1111" when BUSY_EXH = '1' and BUSY_MAIN = '0' else AR_SEL_RD_1_MAIN; --(ISP)
 
     AR_IN_1 <= DATA_TO_CORE when PC_RESTORE_EXH = '1' else
@@ -417,7 +420,7 @@ begin
                DATA_TO_CORE when FETCH_MEM_ADR = '1' else
                DR_OUT_1 when USE_DREG = '1' else -- CAS2: Address register from data register.
                ADR_EFF when OP = JMP or OP = JSR else
-               AR_OUT_1 when OP = LINK or OP = UNLK else 
+               AR_OUT_1 when OP = LINK or OP = UNLK else
                AR_OUT_1 when OP = EXG and BIW_0(7 downto 3) = "01001" else -- Two address registers.
                DR_OUT_2 when OP = EXG and BIW_0(7 downto 3) = "10001" else -- Address- and data register.
                DATA_TO_CORE when OP = RTD or OP = RTR or OP = RTS else
@@ -442,7 +445,7 @@ begin
                   DATA_TO_CORE when OP = ADDX or OP = SUBX else
                   DR_OUT_1 when OP = ASL or OP = ASR or OP = LSL or OP = LSR else
                   DR_OUT_1 when OP = ROTL or OP = ROTR or OP = ROXL or OP = ROXR else
-                  DR_OUT_2 when OP = BFINS else -- The pattern.                  
+                  DR_OUT_2 when OP = BFINS else -- The pattern.
                   DR_OUT_1 when OP = CAS or OP = CAS2 else -- Compare operand.
                   DATA_TO_CORE when OP = CMPM else
                   PC + PC_EW_OFFSET when OP = BSR or OP = JSR else
@@ -479,8 +482,8 @@ begin
                   DATA_IMMEDIATE when OP = ADDI or OP = CMPI or OP = SUBI or OP = ANDI or OP = EORI or OP = ORI else
                   DATA_IMMEDIATE when OP = ADDQ or OP = SUBQ else
                   DATA_IMMEDIATE when OP = ANDI_TO_CCR or OP = ANDI_TO_SR else
-                  DATA_IMMEDIATE when OP = EORI_TO_CCR or OP = EORI_TO_SR else 
-                  DATA_IMMEDIATE when OP = ORI_TO_CCR or OP = ORI_TO_SR else 
+                  DATA_IMMEDIATE when OP = EORI_TO_CCR or OP = EORI_TO_SR else
+                  DATA_IMMEDIATE when OP = ORI_TO_CCR or OP = ORI_TO_SR else
                   DR_OUT_1 when BIW_0(5 downto 3) = "000" else
                   AR_OUT_1 when BIW_0(5 downto 3) = "001" else
                   DATA_IMMEDIATE when BIW_0(5 downto 0) = "111100" else DATA_TO_CORE;
@@ -498,7 +501,7 @@ begin
                   DR_OUT_2 when (OP = ROXL or OP = ROXR) and BIW_0(7 downto 6) /= "11" else -- Register shifts.
                   x"0000" & STATUS_REG when(OP = ANDI_TO_CCR or OP = ANDI_TO_SR) else
                   x"0000" & STATUS_REG when(OP = EORI_TO_CCR or OP = EORI_TO_SR) else
-                  x"0000" & STATUS_REG when(OP = ORI_TO_CCR or OP = ORI_TO_SR) else 
+                  x"0000" & STATUS_REG when(OP = ORI_TO_CCR or OP = ORI_TO_SR) else
                   DATA_TO_CORE when OP = CAS or OP = CAS2 else -- Destination operand.
                   DR_OUT_2 when (OP = CHK2 or OP = CMP2) and USE_DREG = '1' else
                   AR_OUT_2 when OP = CHK or OP = CHK2 or OP = CMP2 else
@@ -512,8 +515,8 @@ begin
                   DR_OUT_2 when BIW_0(5 downto 3) = "000" else
                   AR_OUT_2 when BIW_0(5 downto 3) = "001" else DATA_TO_CORE;
 
-    ALU_OP3_IN <= DATA_TO_CORE when (OP = BFCHG or OP = BFCLR or OP = BFEXTS or OP = BFEXTU) and BIW_0(5 downto 3) /= "000" else 
-                  DATA_TO_CORE when (OP = BFFFO or OP = BFINS or OP = BFSET or OP = BFTST) and BIW_0(5 downto 3) /= "000" else 
+    ALU_OP3_IN <= DATA_TO_CORE when (OP = BFCHG or OP = BFCLR or OP = BFEXTS or OP = BFEXTU) and BIW_0(5 downto 3) /= "000" else
+                  DATA_TO_CORE when (OP = BFFFO or OP = BFINS or OP = BFSET or OP = BFTST) and BIW_0(5 downto 3) /= "000" else
                   DATA_TO_CORE when OP = CAS2 or OP = CHK2 or OP = CMP2 else DR_OUT_1;
 
     OP_SIZE <= OP_SIZE_EXH when BUSY_EXH = '1' and BUSY_MAIN = '0' else OP_SIZE_MAIN;
@@ -585,12 +588,12 @@ begin
 
     -- The bit field offset is bit wise.
     BF_OFFSET <= (x"000000" & "000" & BIW_1(10 downto 6)) when BIW_1(11) = '0' else DR_OUT_1;
-    BF_WIDTH <= '0' & BIW_1(4 downto 0) when BIW_1(4 downto 0) /= "00000" and BIW_1(5) = '0' else 
+    BF_WIDTH <= '0' & BIW_1(4 downto 0) when BIW_1(4 downto 0) /= "00000" and BIW_1(5) = '0' else
                 '0' & DR_OUT_1(4 downto 0) when DR_OUT_1(4 downto 0) /= "00000" and BIW_1(5) = '1' else "100000";
 
     -- The BITPOS is valid for bit operations and bit field operations. For BCHG, BCLR, BSET and BTST
     -- the BITPOS spans o to 31 bytes, when it is in register direct mode. It is modulo  in memory
-    -- manipulation mode. For the bit field operations in register direct mode it also isin the 
+    -- manipulation mode. For the bit field operations in register direct mode it also isin the
     -- range 0 to 31. For bit fields in memory the value is byte wide (0 to 7) because the bit
     -- field from a memory location are loaded from byte boundaries.
     BITPOS <= BIW_1(4 downto 0) when (OP = BCHG or OP = BCLR or OP = BSET or OP = BTST) and BIW_0(8) = '0' and ADR_MODE = "000" else
@@ -613,7 +616,7 @@ begin
 
     RESET_IN <= not RESET_INn;
     IPL <= not IPLn;
-    
+
     REFILL_STATUS: process
     -- This tiny logic provides signal transition on the negative
     -- clock edge.
@@ -629,7 +632,7 @@ begin
 
     SBIT <= STATUS_REG(13);
 
-    -- We need these signals to mark the USP but not the active stack as 
+    -- We need these signals to mark the USP but not the active stack as
     -- used register during MOVE_USP or MOVEC.
     SBIT_AREG <= '0' when USP_WR = '1' else
                  '1' when ISP_WR = '1' or MSP_WR = '1' else STATUS_REG(13);
@@ -638,7 +641,7 @@ begin
 
     ADR_L <= x"000000" & "000" & BIW_0(2 downto 0) & "00" when BKPT_CYCLE = '1' else
              x"FFFFFFF" & IRQ_PEND & '1' when CPU_SPACE_EXH = '1' else
-             ADR_CPY_EXH when DATA_RERUN_EXH = '1' else 
+             ADR_CPY_EXH when DATA_RERUN_EXH = '1' else
              ADR_EFF_WB when DATA_WR_MAIN = '1' else ADR_EFF; -- Exception handler uses ADR_EFF.
 
     ADR_P <= ADR_LATCH when BUS_BSY = '1' else
@@ -656,7 +659,7 @@ begin
     end process P_ADR_LATCH;
 
     P_FC_LATCH  : process
-    -- This register stores the function code during a running bus cycle. 
+    -- This register stores the function code during a running bus cycle.
     begin
         wait until CLK = '1' and CLK' event;
         if BUS_BSY = '0' then
@@ -740,7 +743,9 @@ begin
             PC_INC                  => PC_INC,
             PC_LOAD                 => PC_LOAD,
             PC_RESTORE              => PC_RESTORE_EXH,
-            PC_OFFSET               => PC_OFFSET
+            PC_OFFSET               => PC_OFFSET,
+            -- debug only
+            sp                      => sp
         );
 
     I_ALU: WF68K30L_ALU
@@ -981,49 +986,49 @@ begin
 
     I_EXC_HANDLER: WF68K30L_EXCEPTION_HANDLER
         generic map(VERSION         => VERSION)
-        port map(   
+        port map(
             CLK                     => CLK,
             RESET_CPU               => RESET_CPU,
             BUSY_EXH                => BUSY_EXH,
             BUSY_MAIN               => BUSY_MAIN,
-    
+
             ADR_IN                  => ADR_EFF,
             ADR_CPY                 => ADR_CPY_EXH,
             ADR_OFFSET              => ADR_OFFSET_EXH,
             FC_OUT                  => FC_OUT_EXH,
             CPU_SPACE               => CPU_SPACE_EXH,
-    
+
             DATA_0                  => DATA_TO_CORE(0),
             DATA_RD                 => DATA_RD_EXH,
             DATA_WR                 => DATA_WR_EXH,
             DATA_RERUN              => DATA_RERUN_EXH,
             DATA_IN                 => DATA_IN_EXH,
-    
+
             OP_SIZE                 => OP_SIZE_EXH,
             DATA_RDY                => DATA_RDY,
             DATA_VALID              => DATA_VALID,
             RERUN_RMC               => RERUN_RMC,
-    
+
             OPCODE_RDY              => OPCODE_RDY,
             OPD_ACK                 => OPD_ACK_MAIN,
             OW_VALID                => OW_VALID,
-    
+
             STATUS_REG_IN           => STATUS_REG,
             SR_CPY                  => SR_CPY,
             SR_INIT                 => SR_INIT,
             SR_CLR_MBIT             => SR_CLR_MBIT,
-    
+
             SR_WR                   => SR_WR_EXH,
             ISP_LOAD                => ISP_LOAD_EXH,
             PC_LOAD                 => PC_LOAD_EXH,
             PC_INC                  => PC_INC_EXH,
             PC_RESTORE              => PC_RESTORE_EXH,
             PC_OFFSET               => PC_OFFSET_EXH,
-    
+
             STACK_FORMAT            => STACK_FORMAT,
             STACK_POS               => STACK_POS,
             REST_BIW_0              => REST_BIW_0,
-                
+
             AR_DEC                  => AR_DEC_EXH,
             ADD_DISPL               => SP_ADD_DISPL_EXH,
             DISPLACEMENT            => DISPLACEMENT_EXH,
@@ -1032,10 +1037,10 @@ begin
             RESTORE_ISP_PC          => RESTORE_ISP_PC,
             RTE_INIT                => RTE_INIT,
             RTE_RESUME              => RTE_RESUME,
-    
+
             HALT_OUTn               => HALT_OUTn,
             STATUSn                 => STATUSn_EXH,
-    
+
             IRQ_IN                  => IPL,
             IRQ_PEND                => IRQ_PEND,
             AVECn                   => AVECn,

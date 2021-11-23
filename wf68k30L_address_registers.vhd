@@ -26,12 +26,12 @@
 ---- applicable conditions                                          ----
 ----                                                                ----
 ------------------------------------------------------------------------
--- 
+--
 -- Revision History
--- 
+--
 -- Revision 2K14B 20141201 WF
 --   Initial Release.
--- 
+--
 
 use work.WF68K30L_PKG.all;
 
@@ -120,10 +120,13 @@ entity WF68K30L_ADDRESS_REGISTERS is
         PC_INC              : in bit; -- Program counter increment.
         PC_LOAD             : in bit; -- Program counter write.
         PC_RESTORE          : in bit;
-        PC_OFFSET           : in std_logic_vector(7 downto 0)
+        PC_OFFSET           : in std_logic_vector(7 downto 0);
+
+        -- for debug purposes
+        sp                  : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_ADDRESS_REGISTERS;
-    
+
 architecture BEHAVIOR of WF68K30L_ADDRESS_REGISTERS is
     type AR_TYPE is array(0 to 6) of std_logic_vector(31 downto 0);
     signal ADR_EFF_I        : std_logic_vector(31 downto 0);
@@ -152,6 +155,8 @@ architecture BEHAVIOR of WF68K30L_ADDRESS_REGISTERS is
     signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
     signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
 begin
+    sp <= isp_reg;
+
     INBUFFER: process
     begin
         wait until CLK = '1' and CLK' event;
@@ -193,7 +198,7 @@ begin
         elsif ADR_MARK_UNUSED = '1' or UNMARK = '1' then
             ADR_WB(32) <= '0';
         end if;
-    end process P_IN_USE; 
+    end process P_IN_USE;
 
     AR_IN_USE <= '0' when AR_USED_1(2 downto 0) = "111" and SBIT = '1' and MSBIT(1) /= MBIT else -- Wrong stack pointer.
                  '0' when AR_USED_2(2 downto 0) = "111" and SBIT = '1' and MSBIT(1) /= MBIT else -- Wrong stack pointer.
@@ -222,10 +227,10 @@ begin
         end if;
     end process ADR_FORMAT;
 
-    ADDRESS_MODES: process(ADR_MODE, ADR_OFFSET, AMODE_SEL, AR, AR_IN_1, AR_PNTR_1, B_S, 
-                           CLK, F_E, FETCH_MEM_ADR, I_S, I_IS, ISP_REG, MBIT, MSP_REG, 
+    ADDRESS_MODES: process(ADR_MODE, ADR_OFFSET, AMODE_SEL, AR, AR_IN_1, AR_PNTR_1, B_S,
+                           CLK, F_E, FETCH_MEM_ADR, I_S, I_IS, ISP_REG, MBIT, MSP_REG,
                            PC_EW_OFFSET, PC_I, RESTORE_ISP_PC, SBIT, USE_DREG, USP_REG)
-        -- The effective address calculation takes place in this process depending on the 
+        -- The effective address calculation takes place in this process depending on the
         -- selected addressing mode.
         -- The PC address (PC_I) used for the address calculation points to the first
         -- extension word used.
@@ -234,21 +239,21 @@ begin
         variable ADR_EFF_VAR    : std_logic_vector(31 downto 0);
         variable ADR_EFF_VAR_P  : std_logic_vector(31 downto 0);
         variable BASE_DISPL     : std_logic_vector(31 downto 0);
-        variable I_S_IS         : std_logic_vector(3 downto 0); 
-        variable INDEX      	: std_logic_vector(31 downto 0) := x"00000000";    
+        variable I_S_IS         : std_logic_vector(3 downto 0);
+        variable INDEX      	: std_logic_vector(31 downto 0) := x"00000000";
         variable INDEX_SCALED   : std_logic_vector(31 downto 0);
         variable MEM_ADR        : std_logic_vector(31 downto 0);
         variable OUTER_DISPL    : std_logic_vector(31 downto 0);
         variable PCVAR          : std_logic_vector(31 downto 0);
     begin
-        I_S_IS := I_S & I_IS;        
+        I_S_IS := I_S & I_IS;
         PCVAR := PC_I + PC_EW_OFFSET; -- This is the address of the extension word.
 
         if CLK = '1' and CLK' event then
-            -- This logic selects the INDEX from one of the data registers or from one of 
-            -- the address registers. Furthermore the index needs to be sign extended from 
+            -- This logic selects the INDEX from one of the data registers or from one of
+            -- the address registers. Furthermore the index needs to be sign extended from
             -- 8 bit to 32 bit or from 16 bit to 32 bit dependent on the address mode.
-            -- In case of a long word operation, no extension is required. The index is 
+            -- In case of a long word operation, no extension is required. The index is
             -- multiplied by 1, 2, 4 or 8.
             if STORE_ADR_FORMAT = '1' and EXT_WORD(15) = '0' and EXT_WORD(11) = '1' then
                 INDEX := INDEX_IN; -- Long data register.
@@ -303,7 +308,7 @@ begin
                 MEM_ADR := AR_IN_1;
             end if;
             --
-            -- The displacement needs to be sign extended from 8 bit to 32, from 16 bit to 32 bit or 
+            -- The displacement needs to be sign extended from 8 bit to 32, from 16 bit to 32 bit or
             -- not extended dependent on the address mode.
             if RESET = '1' then
                 BASE_DISPL := (others => '0'); -- Null base displacement.
@@ -381,12 +386,12 @@ begin
         case ADR_MODE is
             -- when "000" | "001" => Direct address modes: no effective address required.
             when "010" | "011" | "100" =>
-                ADR_EFF_VAR := ADR_MUX; -- (An), (An)+, -(An). 
+                ADR_EFF_VAR := ADR_MUX; -- (An), (An)+, -(An).
             when "101" => -- Address register indirect with offset. Assembler syntax: (d16,An).
                 ADR_EFF_VAR := ADR_MUX + BASE_DISPL; -- (d16,An).
             when "110" =>
                 if F_E = '0' then -- Brief extension word.
-                    ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (d8, An, Xn, SIZE*SCALE). 
+                    ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (d8, An, Xn, SIZE*SCALE).
                 else -- Full extension word.
                     case I_S_IS is
                         when "0000" | "1000" => -- No memory indirect action.
@@ -467,8 +472,8 @@ begin
             -- ADR_ATN is important for a correct read access timing:
             -- Due to the one clock delay of the address calculation, ADR_ATN
             -- (address attention) delays a read for one clock cycle, if the
-            -- effective address will change after asserting DATA_RD . This 
-            -- signal is used in the 68K30L top level section for the bus 
+            -- effective address will change after asserting DATA_RD . This
+            -- signal is used in the 68K30L top level section for the bus
             -- access, handshake and request logic.
             if ADR_EFF_VAR_P /= ADR_EFF_VAR then
                 ADR_ATN <= '1';
@@ -481,16 +486,16 @@ begin
 
     ADR_EFF <= ADR_EFF_I;
     ADR_EFF_WB <= ADR_WB(31 downto 0);
-    
+
     -- Data outputs:
     AR_OUT_1_I <= ISP_REG when ISP_RD = '1' else
                   MSP_REG when MSP_RD = '1' else
                   USP_REG when USP_RD = '1' else
-                  AR(AR_PNTR_1) when AR_PNTR_1 < 7 else 
+                  AR(AR_PNTR_1) when AR_PNTR_1 < 7 else
                   MSP_REG when SBIT = '1' and MBIT = '1' else
                   ISP_REG when SBIT = '1' and MBIT = '0' else USP_REG;
 
-    AR_OUT_2_I <= AR(AR_PNTR_2) when AR_PNTR_2 < 7 else 
+    AR_OUT_2_I <= AR(AR_PNTR_2) when AR_PNTR_2 < 7 else
                   MSP_REG when SBIT = '1' and MBIT = '1' else
                   ISP_REG when SBIT = '1' and MBIT = '0' else USP_REG;
 
@@ -553,7 +558,7 @@ begin
                     MSP_REG(7 downto 0) <= AR_IN_1(7 downto 0);
             end case;
         end if;
-        
+
         if AR_INC = '1' and AR_PNTR_1 = 7 and SBIT= '1' and MBIT = '1' then
             case OP_SIZE is
                 when BYTE       => MSP_REG <= MSP_REG + "10"; -- Increment by two!
@@ -561,21 +566,21 @@ begin
                 when others     => MSP_REG <= MSP_REG + "100"; -- Increment by four, (LONG).
             end case;
         end if;
-        
+
         if AR_DEC = '1' and AR_PNTR_1 = 7 and SBIT= '1' and MBIT = '1' then
             case OP_SIZE is
                 when BYTE       => MSP_REG <= MSP_REG - "10"; -- Decrement by two!
                 when WORD       => MSP_REG <= MSP_REG - "10"; -- Decrement by two.
                 when others     => MSP_REG <= MSP_REG - "100"; -- Decrement by four, (LONG).
-            end case;        
+            end case;
         end if;
 
         if MSP_WR = '1' then
             MSP_REG <= AR_IN_1;
         elsif SP_ADD_DISPL = '1' and AR_INC = '1' and SBIT= '1' and MBIT = '1' then
-            MSP_REG <= MSP_REG + DISPLACEMENT + "100"; -- Used for RTD. 
+            MSP_REG <= MSP_REG + DISPLACEMENT + "100"; -- Used for RTD.
         elsif SP_ADD_DISPL = '1' and SBIT= '1' and MBIT = '1' then
-            MSP_REG <= MSP_REG + DISPLACEMENT; 
+            MSP_REG <= MSP_REG + DISPLACEMENT;
         end if;
 
         ---------------------------------------- ISP section ----------------------------------------
@@ -597,7 +602,7 @@ begin
                     ISP_REG(7 downto 0) <= AR_IN_1(7 downto 0);
             end case;
         end if;
-        
+
         if AR_INC = '1' and AR_PNTR_1 = 7 and SBIT= '1' and MBIT = '0' then
             case OP_SIZE is
                 when BYTE       => ISP_REG <= ISP_REG + "10"; -- Increment by two!
@@ -605,7 +610,7 @@ begin
                 when others     => ISP_REG <= ISP_REG + "100"; -- Increment by four, (LONG).
             end case;
         end if;
-        
+
         if AR_DEC = '1' and AR_PNTR_1 = 7 and SBIT = '1' and MBIT = '0' then
             case OP_SIZE is
                 when BYTE       => ISP_REG <= ISP_REG - "10"; -- Decrement by two!
@@ -617,9 +622,9 @@ begin
         if ISP_WR = '1' then
             ISP_REG <= AR_IN_1;
         elsif SP_ADD_DISPL = '1' and AR_INC = '1' and SBIT= '1' and MBIT = '0' then
-            ISP_REG <= ISP_REG + DISPLACEMENT + "100"; -- Used for RTD. 
+            ISP_REG <= ISP_REG + DISPLACEMENT + "100"; -- Used for RTD.
         elsif SP_ADD_DISPL = '1' and SBIT= '1' and MBIT = '0' then
-            ISP_REG <= ISP_REG + DISPLACEMENT; 
+            ISP_REG <= ISP_REG + DISPLACEMENT;
         end if;
 
         ---------------------------------------- USP section ----------------------------------------
@@ -641,7 +646,7 @@ begin
                     USP_REG(7 downto 0) <= AR_IN_1(7 downto 0);
             end case;
         end if;
-        
+
         if AR_INC = '1' and AR_PNTR_1 = 7 and SBIT = '0' then
             case OP_SIZE is
                 when BYTE       => USP_REG <= USP_REG + "10"; -- Increment by two!
@@ -649,7 +654,7 @@ begin
                 when others     => USP_REG <= USP_REG + "100"; -- Increment by four, (LONG).
             end case;
         end if;
-        
+
         if AR_DEC = '1' and AR_PNTR_1 = 7 and SBIT = '0' then
             case OP_SIZE is
                 when BYTE       => USP_REG <= USP_REG - "10"; -- Decrement by two!
@@ -657,13 +662,13 @@ begin
                 when others     => USP_REG <= USP_REG - "100"; -- Decrement by four, (LONG).
             end case;
         end if;
-        
+
         if USP_WR = '1' then
             USP_REG <= AR_IN_1;
         elsif SP_ADD_DISPL = '1' and AR_INC = '1' and SBIT= '0' then
-            USP_REG <= USP_REG + DISPLACEMENT + "100"; -- Used for RTD. 
+            USP_REG <= USP_REG + DISPLACEMENT + "100"; -- Used for RTD.
         elsif SP_ADD_DISPL = '1' and SBIT= '0' then
-            USP_REG <= USP_REG + DISPLACEMENT; 
+            USP_REG <= USP_REG + DISPLACEMENT;
         end if;
 
         if AR_WR_2 = '1' and AR_PNTR_WB_2 = 7 and SBIT= '1' and MBIT = '1' then
@@ -681,13 +686,13 @@ begin
     -- decrement and others are possible for
     -- different registers.
     begin
-        -- 
+        --
         wait until CLK = '1' and CLK' event;
 
         if RESET = '1' then
             AR <= (others => (Others => '0'));
         end if;
-        
+
         if AR_WR_1 = '1' and AR_PNTR_WB_1 < 7 then
             case OP_SIZE_WB is
                 when LONG =>
@@ -704,7 +709,7 @@ begin
                     AR(AR_PNTR_WB_1)(7 downto 0) <= AR_IN_1(7 downto 0);
             end case;
         end if;
-        
+
         if AR_INC = '1' and AR_PNTR_1 < 7 then
             case OP_SIZE is
                 when BYTE       => AR(AR_PNTR_1) <= AR(AR_PNTR_1) + '1';
@@ -712,14 +717,14 @@ begin
                 when others     => AR(AR_PNTR_1) <= AR(AR_PNTR_1) + "100";
             end case;
         end if;
-        
+
         if AR_DEC = '1' and AR_PNTR_1 < 7 then
             case OP_SIZE is
                 when BYTE       => AR(AR_PNTR_1) <= AR(AR_PNTR_1) - '1';
                 when WORD       => AR(AR_PNTR_1) <= AR(AR_PNTR_1) - "10";
                 when others     => AR(AR_PNTR_1) <= AR(AR_PNTR_1) - "100";
             end case;
-        end if;        
+        end if;
 
         if AR_WR_2 = '1' and AR_PNTR_WB_2 < 7 then -- Used for EXG.
             AR(AR_PNTR_WB_2) <= AR_IN_2;
