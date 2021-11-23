@@ -1,56 +1,33 @@
 [*]
-[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
-[*] Mon Nov 22 08:38:07 2021
+[*] GTKWave Analyzer v3.3.111 (w)1999-2020 BSI
+[*] Tue Nov 23 07:17:04 2021
 [*]
-[dumpfile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.vcd"
-[dumpfile_mtime] "Mon Nov 22 08:25:27 2021"
-[dumpfile_size] 151389
+[dumpfile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.ghw"
+[dumpfile_mtime] "Tue Nov 23 07:01:13 2021"
+[dumpfile_size] 1217228
 [savefile] "/home/mfro/Dokumente/Development/vhdl/suska_030/ghdl/tb.gtkw"
-[timestart] 25092000000
-[size] 1713 799
-[pos] -1 -1
-*-27.744219 25760000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
-[treeopen] tb.
-[treeopen] tb.i_m68030.
-[sst_width] 251
-[signals_width] 225
+[timestart] 36279600000
+[size] 1464 795
+[pos] 355 -45
+*-26.304644 36480000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[treeopen] top.tb.
+[treeopen] top.tb.i_m68030.
+[sst_width] 228
+[signals_width] 218
 [sst_expanded] 1
-[sst_vpaned_height] 286
+[sst_vpaned_height] 209
 @28
-tb.clk_25
+top.tb.clk_25
+top.tb.as_n
 @22
-tb.adr_out[31:0]
+#{top.tb.adr_out[31:0]} top.tb.adr_out[31] top.tb.adr_out[30] top.tb.adr_out[29] top.tb.adr_out[28] top.tb.adr_out[27] top.tb.adr_out[26] top.tb.adr_out[25] top.tb.adr_out[24] top.tb.adr_out[23] top.tb.adr_out[22] top.tb.adr_out[21] top.tb.adr_out[20] top.tb.adr_out[19] top.tb.adr_out[18] top.tb.adr_out[17] top.tb.adr_out[16] top.tb.adr_out[15] top.tb.adr_out[14] top.tb.adr_out[13] top.tb.adr_out[12] top.tb.adr_out[11] top.tb.adr_out[10] top.tb.adr_out[9] top.tb.adr_out[8] top.tb.adr_out[7] top.tb.adr_out[6] top.tb.adr_out[5] top.tb.adr_out[4] top.tb.adr_out[3] top.tb.adr_out[2] top.tb.adr_out[1] top.tb.adr_out[0]
+#{top.tb.data_out[31:0]} top.tb.data_out[31] top.tb.data_out[30] top.tb.data_out[29] top.tb.data_out[28] top.tb.data_out[27] top.tb.data_out[26] top.tb.data_out[25] top.tb.data_out[24] top.tb.data_out[23] top.tb.data_out[22] top.tb.data_out[21] top.tb.data_out[20] top.tb.data_out[19] top.tb.data_out[18] top.tb.data_out[17] top.tb.data_out[16] top.tb.data_out[15] top.tb.data_out[14] top.tb.data_out[13] top.tb.data_out[12] top.tb.data_out[11] top.tb.data_out[10] top.tb.data_out[9] top.tb.data_out[8] top.tb.data_out[7] top.tb.data_out[6] top.tb.data_out[5] top.tb.data_out[4] top.tb.data_out[3] top.tb.data_out[2] top.tb.data_out[1] top.tb.data_out[0]
+#{top.tb.data_in[31:0]} top.tb.data_in[31] top.tb.data_in[30] top.tb.data_in[29] top.tb.data_in[28] top.tb.data_in[27] top.tb.data_in[26] top.tb.data_in[25] top.tb.data_in[24] top.tb.data_in[23] top.tb.data_in[22] top.tb.data_in[21] top.tb.data_in[20] top.tb.data_in[19] top.tb.data_in[18] top.tb.data_in[17] top.tb.data_in[16] top.tb.data_in[15] top.tb.data_in[14] top.tb.data_in[13] top.tb.data_in[12] top.tb.data_in[11] top.tb.data_in[10] top.tb.data_in[9] top.tb.data_in[8] top.tb.data_in[7] top.tb.data_in[6] top.tb.data_in[5] top.tb.data_in[4] top.tb.data_in[3] top.tb.data_in[2] top.tb.data_in[1] top.tb.data_in[0]
 @28
-tb.dsack_n[1:0]
-@22
-tb.data_in[31:0]
+#{top.tb.size_n[1:0]} top.tb.size_n[1] top.tb.size_n[0]
+#{top.tb.dsack_n[1:0]} top.tb.dsack_n[1] top.tb.dsack_n[0]
 @23
-tb.data_out[31:0]
-@28
-tb.rw_n
-tb.clk_25
-tb.reset_n
-tb.halt_n
-tb.berr_n
-@22
-tb.i_m68030.pc[31:0]
-tb.adr_out[31:0]
-tb.data_in[31:0]
-@28
-tb.rw_n
-tb.size_n[1:0]
-tb.ecs_n
-tb.ocs_n
-tb.reset_n_out
-tb.bg_n
-tb.bgack_n
-tb.br_n
-tb.bus_en
-tb.data_en
-@22
-tb.data_out[31:0]
-@28
-tb.dben_n
-tb.dsack_n[1:0]
+#{top.tb.i_m68030.pc[31:0]} top.tb.i_m68030.pc[31] top.tb.i_m68030.pc[30] top.tb.i_m68030.pc[29] top.tb.i_m68030.pc[28] top.tb.i_m68030.pc[27] top.tb.i_m68030.pc[26] top.tb.i_m68030.pc[25] top.tb.i_m68030.pc[24] top.tb.i_m68030.pc[23] top.tb.i_m68030.pc[22] top.tb.i_m68030.pc[21] top.tb.i_m68030.pc[20] top.tb.i_m68030.pc[19] top.tb.i_m68030.pc[18] top.tb.i_m68030.pc[17] top.tb.i_m68030.pc[16] top.tb.i_m68030.pc[15] top.tb.i_m68030.pc[14] top.tb.i_m68030.pc[13] top.tb.i_m68030.pc[12] top.tb.i_m68030.pc[11] top.tb.i_m68030.pc[10] top.tb.i_m68030.pc[9] top.tb.i_m68030.pc[8] top.tb.i_m68030.pc[7] top.tb.i_m68030.pc[6] top.tb.i_m68030.pc[5] top.tb.i_m68030.pc[4] top.tb.i_m68030.pc[3] top.tb.i_m68030.pc[2] top.tb.i_m68030.pc[1] top.tb.i_m68030.pc[0]
 [pattern_trace] 1
 [pattern_trace] 0

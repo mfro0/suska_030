@@ -79,7 +79,7 @@ begin
     p_once : process
     begin
         for i in 0 to memory'length - 1 loop
-            report "memory(" & integer'image(i) & ") = " & to_hstring(memory(i)) severity note;
+            --report "memory(" & integer'image(i) & ") = " & to_hstring(memory(i)) severity note;
         end loop;
         wait;
     end process p_once;
@@ -92,6 +92,7 @@ begin
     p_read : process(all)
         variable adr : integer;
         variable cs  : string(1 to 1);
+        variable l   : line;
     begin
         --if rising_edge(clk_25) then
             dsack_n <= (others => 'Z');
@@ -107,12 +108,16 @@ begin
                 elsif adr_out = x"fffffff4" then
                     -- UART output register
                     if rw_n = '0' then                      -- write cycle
-                        report "value=" & to_hstring(data_out) severity note;
+                        --report "value=" & to_hstring(data_out) severity note;
+
                         cs(1) := character'val(to_integer(unsigned(data_out(7 downto 0))));
                         dsack_n <= (others => '0');
-                        report cs severity note;
+                        --report cs severity note;
+                        write(l, cs);
+                        report l.all severity note;
                     end if;
-                elsif unsigned(adr_out) / 4 >= to_unsigned(memory'low, 32) and unsigned(adr_out) / 4 <= to_unsigned(memory'high, 32) then
+                elsif unsigned(adr_out) / 4 >= to_unsigned(memory'low, 32) and
+                      unsigned(adr_out) / 4 <= to_unsigned(memory'high, 32) then
                     adr := to_integer(unsigned(adr_out)) / 4;
 
                     if rw_n = '1' then

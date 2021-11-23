@@ -1,11 +1,11 @@
 static int putchar(int c)
 {
-    volatile int *term_ready = (volatile int *) 0xfffffff0;
-    volatile int *term_out = (volatile int *) 0xfffffff4;
+    volatile long *term_ready = (volatile long *) 0xfffffff0;
+    volatile long *term_out = (volatile long *) 0xfffffff4;
 
 
-    while (!*term_ready);
-    *term_out = c;
+    while (! *term_ready);
+    *term_out = (long) c;
 
     return 1;
 }

@@ -36,7 +36,7 @@ tb: tb.o code
 
 .PHONY: run
 run: tb
-	./tb $(GHDL_RUNFLAGS) --vcd=tb.vcd
+	./tb $(GHDL_RUNFLAGS) --wave=tb.ghw
 .PHONY: clean
 clean:
 	rm $(TG68_OBJS) tb
