@@ -108,20 +108,24 @@ begin
                 elsif adr_out = x"fffffff4" then
                     -- UART output register
                     if rw_n = '0' then                      -- write cycle
-                        --report "value=" & to_hstring(data_out) severity note;
-
-                        cs(1) := character'val(to_integer(unsigned(data_out(7 downto 0))));
-                        dsack_n <= (others => '0');
-                        --report cs severity note;
-                        write(l, cs);
-                        report l.all severity note;
+                        if dben_n = '0' then
+                            cs(1) := character'val(to_integer(unsigned(data_out(7 downto 0))));
+                            write(l, cs);
+                            if cs(1) = LF then
+                                writeline(OUTPUT, l);
+                            end if;
+                            dsack_n <= (others => '0');
+                            --report l.all severity note;
+                        end if;
                     end if;
                 elsif unsigned(adr_out) / 4 >= to_unsigned(memory'low, 32) and
                       unsigned(adr_out) / 4 <= to_unsigned(memory'high, 32) then
                     adr := to_integer(unsigned(adr_out)) / 4;
 
                     if rw_n = '1' then
-                        data_in <= memory(adr);
+                        if dben_n = '0' then
+                            data_in <= memory(adr);
+                        end if;
                     else        -- write to memory
                         memory(adr) <= data_out;
                     end if;

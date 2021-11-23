@@ -7,16 +7,24 @@
 
                 .org    0
 
+                .globl  _putchar
                 .text
 _start:         .long   initialstack
                 .long   initialpc
 
 initialpc:
                 lea     initialstack,sp
-loop:           pea     hello_world
-                bsr     _puts
-                addq.l  #4,sp
-                bra.s   loop
+loop:           lea     hello_world,a0
+iloop:          move.b  (a0)+,d0
+                beq     end_loop
+                and.l   #0xff,d0
+
+                | output character
+not_ready:      tst.l   0xfffffff0
+                beq     not_ready
+                move.l  d0,0xfffffff4
+                bra.s   iloop
+end_loop:       bra.s   loop
 
 
                 .data
