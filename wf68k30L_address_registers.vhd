@@ -155,7 +155,7 @@ architecture BEHAVIOR of WF68K30L_ADDRESS_REGISTERS is
     signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
     signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
 begin
-    sp <= isp_reg;
+    sp <= std_ulogic_vector(isp_reg);
 
     INBUFFER: process
     begin
