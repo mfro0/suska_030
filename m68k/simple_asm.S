@@ -15,7 +15,7 @@ initialpc:
                 lea     initialstack,sp
 
 loop:           lea     hello_world,a0
-                jsr     print_string
+                bsr     print_string
                 jra     loop
 
 *
