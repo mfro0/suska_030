@@ -81,13 +81,15 @@ architecture sim of tb is
     signal stack                : stackdisplay := (others => (others => '0'));
 
     --
-    -- display stack and memory around (-5 to +5 long words below
-    -- and above where s points to) in waveform viewer (show "stack" array)
+    -- Build a small array around memory the stack pointer points to.
+    -- This enables waveform viewers to display stack and memory around 
+    -- (-5 to +5 long words below and above where s points to) 
+    --
     procedure stack_viewer(signal s : in std_logic_vector(31 downto 0);
                            signal mem : in memarray;
                            signal sd : out stackdisplay) is
     begin
-        if not is_x(s) then
+        if not is_x(s) then             -- only if we have a valid stack pointer
             for i in sd'low to sd'high loop
                 -- do a sanity check to avoid bailout when stackpointer is
                 -- uninitialised during core startup

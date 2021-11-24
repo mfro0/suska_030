@@ -32,7 +32,7 @@
 create_clock -period 33.000 -name CLK [get_ports {CLK}]
 
 set_input_delay -clock CLK -min 1.0 [all_inputs]
-set_input_delay -clock CLK -max 1.0 [all_inputs]
+set_input_delay -clock CLK -max 2.0 [all_inputs]
 set_output_delay -clock CLK -min 1.0 [all_outputs]
 set_output_delay -clock CLK -max 2.0 [all_outputs]
 
