@@ -4,23 +4,25 @@
 ----                                                                ----
 ---- Description:                                                   ----
 ---- This arithmetical logical unit handles all integer operations. ----
----- The shift operations are computed by a barrell shifter within  ----
----- one clock cycle. This unit also handles the bit field opera-   ----
----- tions within one clock cycle. The multiplication is modeled as ----
----- a hardware multiplier which calculates the result in one clock ----
----- cycle. The division requires 32 clock cycles for 32 bit wide   ----
----- operands. The date which is required for the respective opera- ----
----- tion is stored in registers. The ALU works as third stage in   ----
----- the pipeline. The handshaking is provided by ALU_REQ, ALU_ACK  ----
----- and ALU_BUSY. For more information refer to the MC68030 User'  ----
----- Manual.                                                        ----
+---- The shift operations are computed by a standard shifter within ----
+---- up to 32 clock cycles depending on the shift width. This unit  ----
+---- also handles the bit field operations within one clock cycle.  ----
+---- The multiplication is modeled as a hardware multiplier which   ----
+---- calculates the result in one clock cycle. The division requi-  ----
+---- res 32 clock cycles for 32 bit wide operands. The date which   ----
+---- is required for the respective operation is stored in regis-   ----
+---- ters. The ALU works together with the writeback of the oper-   ----
+---- ands as third stage in the pipelined architecture. The hand-   ----
+---- shaking is provided by ALU_REQ, ALU_ACK and ALU_BUSY. For more ----
+---- information refer to the MC68010 User' Manual.                 ----
+----                                                                ----
 ----                                                                ----
 ---- Author(s):                                                     ----
 ---- - Wolfgang Foerster, wf@experiment-s.de; wf@inventronik.de     ----
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright © 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -37,6 +39,35 @@
 -- 
 -- Revision 2K14B 20141201 WF
 --   Initial Release.
+-- Revision 2K14B 20141201 WF
+--   Fixed the CAS and CAS2 conditional testing. Thanks to Raymond Mounissamy for the correct code.
+-- Revision 2K18A 20180620 WF
+--   Bug fix: MOVEM sign extension.
+--   Fix for restoring correct values during the DIVS and DIVU in word format.
+--   Fixed the SUBQ calculation.
+--   Rearranged the Offset for the JSR instruction.
+--   EXT instruction uses now RESULT(63 downto 0).
+--   Shifter signals now ready if shift width is zero.
+--   Fixed wrong condition codes for AND_B, ANDI, EOR, EORI, OR_B, ORI and NOT_B.
+--   Fixed writeback issues in the status register logic.
+--   Fixed the condition code calculation for NEG and NEGX.
+-- Revision 2K19A 20190620 WF
+--   Fixed a bug in MULU.W (input operands are now 16 bit wide).
+-- Revision 2K21A 20210620 WF
+--   Fixed wrong CMPA.W results.
+--   Removed a X_IN data hazard for ABCD, SBCD, NBCD.
+--   Removed a X_IN data hazard for ADDX, NEGX, SUBX.
+--   Switched to partially populated status register for more compatibility.
+--   Fixed several DIVS and DIVU topics.
+--   Fixed several MULS and MULU topics.
+--   Several bugfixes related to the bitfield operations.
+--   Fixed the ALU_COND for CAS.W and CAS.L.
+--   MOVES An,(An)+ writes now the incremented value of An to memory.
+--   Adjusted condition codes for CHK.
+--   Fixed a TRAP_DIVZERO data hazard.
+--   Extended ABCD, NBCD, SBCD to full 4 bit logic.
+--   CHK2: address register compares are now 32 bit wide.
+--   Fixed CHK2, CMP2 conditional logic.
 -- 
 
 library work;
@@ -50,6 +81,7 @@ use ieee.numeric_std.all;
 entity WF68K30L_ALU is
     port (
         CLK                 : in std_logic;
+        RESET               : in bit;
 
         LOAD_OP1            : in bit;
         LOAD_OP2            : in bit;
@@ -68,6 +100,7 @@ entity WF68K30L_ALU is
         ADR_MODE_IN         : in Std_Logic_Vector(2 downto 0);
         OP_SIZE_IN          : in OP_SIZETYPE;
         OP_IN               : in OP_68K;
+        OP_WB               : in OP_68K;
         BIW_0_IN            : in Std_Logic_Vector(11 downto 0);
         BIW_1_IN            : in Std_Logic_Vector(15 downto 0);
 
@@ -77,15 +110,15 @@ entity WF68K30L_ALU is
         SR_CLR_MBIT         : in bit;
         CC_UPDT             : in bit;
 
-        STATUS_REG_OUT	    : out std_logic_vector(15 downto 0);
+        STATUS_REG_OUT      : out std_logic_vector(15 downto 0);
         ALU_COND            : out boolean;
         
         -- Status and Control:
         ALU_INIT            : in bit; -- Strobe.
         ALU_BSY             : out bit;
-        ALU_REQ             : out bit;
+        ALU_REQ             : buffer bit;
         ALU_ACK             : in bit;
-        USE_DREG            : in bit; -- Used for CAS2, CHK2, CMP2.
+        USE_DREG            : in bit; -- Used for CHK2, CMP2.
         HILOn               : in bit;
         IRQ_PEND            : in std_logic_vector(2 downto 0);
         TRAP_CHK            : out bit; -- Trap due to the CHK, CHK2 instructions.
@@ -94,53 +127,56 @@ entity WF68K30L_ALU is
 end entity WF68K30L_ALU;
     
 architecture BEHAVIOUR of WF68K30L_ALU is
-    type DIV_STATES is (IDLE, INIT, CALC);
-    type SHIFT_STATES is (IDLE, RUN);
-    signal ALU_COND_I           : boolean;
-    signal ADR_MODE             : Std_Logic_Vector(2 downto 0);
-    signal BITPOS               : integer range 0 to 31;
-    signal BF_DATA_IN           : Std_Logic_Vector(39 downto 0);
-    signal BF_LOWER_BND         : integer range 0 to 39;
-    signal BF_OFFSET            : Std_Logic_Vector(31 downto 0);
-    signal BF_UPPER_BND         : integer range 0 to 39;
-    signal BF_WIDTH             : integer range 1 to 32;
-    signal BIW_0                : Std_Logic_Vector(11 downto 0);
-    signal BIW_1                : Std_Logic_Vector(15 downto 0);
-    signal CAS2_COND            : boolean;
-    signal CB_BCD               : std_logic;
-    signal CHK_CMP_COND         : boolean;
-    signal CHK2CMP2_DR          : bit;
-    signal DIV_RDY              : bit;
-    signal DIV_STATE            : DIV_STATES := IDLE;
-    signal MSB                  : integer range 0 to 31;
-    signal OP                   : OP_68K := UNIMPLEMENTED;
-    signal OP1                  : Std_Logic_Vector(31 downto 0);
-    signal OP2                  : Std_Logic_Vector(31 downto 0);
-    signal OP3                  : Std_Logic_Vector(31 downto 0);
-    signal OP1_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-    signal OP2_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-    signal OP3_SIGNEXT          : Std_Logic_Vector(31 downto 0);
-    signal OP_SIZE              : OP_SIZETYPE := LONG;
-    signal QUOTIENT             : unsigned(31 downto 0);
-    signal REMAINDER            : unsigned(31 downto 0);
-    signal RESULT_BCDOP         : Std_Logic_Vector(7 downto 0);
-    signal RESULT_BITFIELD      : Std_Logic_Vector(39 downto 0);
-    signal RESULT_BITOP		    : Std_Logic_Vector(31 downto 0);
-    signal RESULT_INTOP         : Std_Logic_Vector(31 downto 0);
-    signal RESULT_LOGOP         : Std_Logic_Vector(31 downto 0);
-    signal RESULT_MUL           : Std_Logic_Vector(63 downto 0);
-    signal RESULT_SHIFTOP		: Std_Logic_Vector(31 downto 0);
-    signal RESULT_OTHERS        : Std_Logic_Vector(31 downto 0);
-    signal SHIFT_STATE	        : SHIFT_STATES;
-    signal SHIFT_WIDTH          : Std_Logic_Vector(5 downto 0);
-    signal SHIFT_WIDTH_IN       : Std_Logic_Vector(5 downto 0);
-    signal SHFT_LOAD            : bit;
-    signal SHFT_RDY             : bit;
-    signal SHFT_EN	            : bit;
-    signal STATUS_REG           : Std_Logic_Vector(15 downto 0);
-    signal VFLAG_DIV            : std_logic;
-    signal XFLAG_SHFT           : std_logic;
-    signal XNZVC                : Std_Logic_Vector(4 downto 0);
+type DIV_STATES is (IDLE, INIT, CALC);
+type SHIFT_STATES is (IDLE, RUN);
+signal ALU_COND_I           : boolean;
+signal ADR_MODE             : Std_Logic_Vector(2 downto 0);
+signal BITPOS               : integer range 0 to 31;
+signal BF_DATA_IN           : Std_Logic_Vector(39 downto 0);
+signal BF_LOWER_BND         : integer range 0 to 39;
+signal BF_OFFSET            : Std_Logic_Vector(31 downto 0);
+signal BF_UPPER_BND         : integer range 0 to 39;
+signal BF_WIDTH             : integer range 1 to 32;
+signal BF_OPSIZE            : OP_SIZETYPE;
+signal BIW_0                : Std_Logic_Vector(11 downto 0);
+signal BIW_1                : Std_Logic_Vector(15 downto 0);
+signal CAS2_COND            : boolean;
+signal CB_BCD               : std_logic;
+signal CHK_CMP_COND         : boolean;
+signal CHK2CMP2_DR          : bit;
+signal DIV_RDY              : bit;
+signal DIV_STATE            : DIV_STATES := IDLE;
+signal MSB                  : integer range 0 to 31;
+signal OP                   : OP_68K := UNIMPLEMENTED;
+signal OP1                  : Std_Logic_Vector(31 downto 0);
+signal OP2                  : Std_Logic_Vector(31 downto 0);
+signal OP3                  : Std_Logic_Vector(31 downto 0);
+signal OP1_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+signal OP2_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+signal OP3_SIGNEXT          : Std_Logic_Vector(31 downto 0);
+signal OP_SIZE              : OP_SIZETYPE := LONG;
+signal QUOTIENT             : unsigned(31 downto 0);
+signal REMAINDER            : unsigned(31 downto 0);
+signal RESULT_BCDOP         : Std_Logic_Vector(7 downto 0);
+signal RESULT_BITFIELD      : Std_Logic_Vector(39 downto 0);
+signal RESULT_BITOP         : Std_Logic_Vector(31 downto 0);
+signal RESULT_INTOP         : Std_Logic_Vector(31 downto 0);
+signal RESULT_LOGOP         : Std_Logic_Vector(31 downto 0);
+signal RESULT_MUL           : Std_Logic_Vector(63 downto 0);
+signal RESULT_SHIFTOP       : Std_Logic_Vector(31 downto 0);
+signal RESULT_OTHERS        : Std_Logic_Vector(31 downto 0);
+signal SHIFT_STATE          : SHIFT_STATES;
+signal SHIFT_WIDTH          : Std_Logic_Vector(5 downto 0);
+signal SHIFT_WIDTH_IN       : Std_Logic_Vector(5 downto 0);
+signal SHFT_LOAD            : bit;
+signal SHFT_RDY             : bit;
+signal SHFT_EN              : bit;
+signal STATUS_REG           : Std_Logic_Vector(15 downto 0);
+signal VFLAG_DIV            : std_logic;
+signal X_IN                 : std_logic;
+signal XFLAG_SHFT           : std_logic;
+signal XNZVC                : Std_Logic_Vector(4 downto 0);
+signal ZFLAG_CAS            : std_logic;
 begin
     PARAMETER_BUFFER: process
     begin
@@ -155,24 +191,35 @@ begin
             BF_OFFSET <= BF_OFFSET_IN;
             BITPOS <= To_Integer(unsigned(BITPOS_IN));
             BF_WIDTH <= To_Integer(unsigned(BF_WIDTH_IN));
-            BF_UPPER_BND <= 39 - To_Integer(unsigned(BITPOS_IN));
+            case BF_OPSIZE is
+                when BYTE => BF_UPPER_BND <= 15 - To_Integer(unsigned(BITPOS_IN));
+                when WORD => BF_UPPER_BND <= 23 - To_Integer(unsigned(BITPOS_IN));
+                when LONG => BF_UPPER_BND <= 39 - To_Integer(unsigned(BITPOS_IN));
+            end case;
             SHIFT_WIDTH <= SHIFT_WIDTH_IN;
+            X_IN <= STATUS_REG(4);
             --
-            if To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)) > 40 then
+            if ADR_MODE_IN = "000" and ((To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN))) > 32) then -- We need a rollover mode in Bit 8 to 39.
+                BF_LOWER_BND <= 40 - (To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)) - 32);
+            elsif To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)) > 40 then
                 BF_LOWER_BND <= 0;
             else 
-                BF_LOWER_BND <= 40 - (To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)));
+                case BF_OPSIZE is
+                    when BYTE => BF_LOWER_BND <= 16 - (To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)));
+                    when WORD => BF_LOWER_BND <= 24 - (To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)));
+                    when LONG => BF_LOWER_BND <= 40 - (To_Integer(unsigned(BITPOS_IN)) + To_Integer(unsigned(BF_WIDTH_IN)));
+                end case;
             end if;
         end if;
     end process PARAMETER_BUFFER;
 
     OPERANDS: process
-        -- During instruction execution, the buffers are written
-        -- before or during ALU_INIT and copied to the operands
-        -- during ALU_INIT.
-        variable OP1_BUFFER		: Std_Logic_Vector(31 downto 0);
-        variable OP2_BUFFER		: Std_Logic_Vector(31 downto 0);
-        variable OP3_BUFFER		: Std_Logic_Vector(31 downto 0);
+    -- During instruction execution, the buffers are written
+    -- before or during ALU_INIT and copied to the operands
+    -- during ALU_INIT.
+    variable OP1_BUFFER     : Std_Logic_Vector(31 downto 0);
+    variable OP2_BUFFER     : Std_Logic_Vector(31 downto 0);
+    variable OP3_BUFFER     : Std_Logic_Vector(31 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
         if LOAD_OP1 = '1' then
@@ -185,6 +232,7 @@ begin
 
         if LOAD_OP3 = '1' then
             OP3_BUFFER := OP3_IN;
+            BF_OPSIZE <= OP_SIZE_IN;
         end if;
         
         if ALU_INIT = '1' then
@@ -199,10 +247,10 @@ begin
         wait until CLK = '1' and CLK' event;
         if ALU_INIT = '1' then
             ALU_BSY <= '1';
-        elsif ALU_ACK = '1' then
+        elsif ALU_ACK = '1' or RESET = '1' then
             ALU_BSY <= '0';
         end if;
-        -- This signal requests the 
+        -- This signal requests the control state machine to proceed when the ALU is ready.
         if ALU_ACK = '1' then
             ALU_REQ <= '0';
         elsif (OP = ASL or OP = ASR or OP = LSL or OP = LSR or OP = ROTL or OP = ROTR or OP = ROXL or OP = ROXR) and SHFT_RDY = '1' then
@@ -220,13 +268,12 @@ begin
         end if;
     end process P_BUSY;
     
-    with OP_SIZE select
-        MSB <= 31 when LONG,
-               15 when WORD,
-                7 when BYTE;
+    MSB <= 31 when OP = CMPA else -- CMPA compares always to a LONG destination address register.
+           31 when OP_SIZE = LONG else
+           15 when OP_SIZE = WORD else 7;
 
     SIGNEXT: process(OP, OP1, OP2, OP3, OP_SIZE)
-        -- This module provides the required sign extensions.
+    -- This module provides the required sign extensions.
     begin
         case OP_SIZE is
             when LONG =>
@@ -254,47 +301,59 @@ begin
         end case;
     end process SIGNEXT;
 
-    P_BCDOP: process(OP, STATUS_REG, OP1, OP2)
-        -- The BCD operations are all byte wide and unsigned.
-        variable X_IN_I         : unsigned(0 downto 0);
-        variable TEMP0          : unsigned(4 downto 0);
-        variable TEMP1          : unsigned(4 downto 0);
-        variable Z_0            : unsigned(3 downto 0);
-        variable C_0            : unsigned(0 downto 0);
-        variable Z_1            : unsigned(3 downto 0);
-        variable C_1            : std_logic;
-        variable S_0            : unsigned(3 downto 0);
-        variable S_1            : unsigned(3 downto 0);
+    P_BCDOP: process(OP, X_IN, OP1, OP2)
+    -- The BCD operations are all byte wide and unsigned.
+    variable X_IN_I         : unsigned(0 downto 0);
+    variable TEMP0          : unsigned(4 downto 0);
+    variable TEMP1          : unsigned(5 downto 0);
+    variable Z_0            : unsigned(3 downto 0);
+    variable C_0            : unsigned(1 downto 0);
+    variable Z_1            : unsigned(3 downto 0);
+    variable C_1            : std_logic;
+    variable S_0            : unsigned(3 downto 0);
+    variable S_1            : unsigned(3 downto 0);
     begin
-        X_IN_I(0) := STATUS_REG(4); -- Inverted extended Flag.
+        X_IN_I(0) := X_IN; -- Inverted extended Flag.
 
         case OP is
             when ABCD =>
                 TEMP0 := unsigned('0' & OP2(3 downto 0)) + unsigned('0' & OP1(3 downto 0)) + ("0000" & X_IN_I);
             when NBCD =>
-                TEMP0 := "00000" - unsigned('0' & OP2(3 downto 0)) - ("0000" & X_IN_I);
+                TEMP0 := unsigned(OP1(4 downto 0)) - unsigned('0' & OP2(3 downto 0)) - ("0000" & X_IN_I);
             when others => -- Valid for SBCD.
                 TEMP0 := unsigned('0' & OP2(3 downto 0)) - unsigned('0' & OP1(3 downto 0)) - ("0000" & X_IN_I);
         end case;
 
-        if Std_Logic_Vector(TEMP0) > "01001" then
+        if OP = ABCD and Std_Logic_Vector(TEMP0) > "11001" then
             Z_0 := "0110";
-            C_0 := "1";
+            C_0 := "10";
+        elsif OP = ABCD and Std_Logic_Vector(TEMP0) > "01001" then
+            Z_0 := "0110";
+            C_0 := "01";
+        elsif (OP = NBCD or OP = SBCD) and Std_Logic_Vector(TEMP0) > "10101" then -- -1 ... -10.
+            Z_0 := "0110";
+            C_0 := "01";
+        elsif (OP = NBCD or OP = SBCD) and Std_Logic_Vector(TEMP0) > "01111" then -- -11 ... -16.
+            Z_0 := "0110";
+            C_0 := "10";
         else
             Z_0 := "0000";
-            C_0 := "0";
+            C_0 := "00";
         end if;
 
         case OP is
             when ABCD =>
-                TEMP1 := unsigned('0' & OP2(7 downto 4)) + unsigned('0' & OP1(7 downto 4)) + ("0000" & C_0);
+                TEMP1 := unsigned("00" & OP2(7 downto 4)) + unsigned("00" & OP1(7 downto 4)) + ("0000" & C_0);
             when NBCD =>
-                TEMP1 := "00000" - unsigned('0' & OP2(7 downto 4)) - ("0000" & C_0);
+                TEMP1 := unsigned("00" & OP1(3 downto 0)) - unsigned("00" & OP2(7 downto 4)) - ("0000" & C_0);
             when others => -- Valid for SBCD.
-                TEMP1 := unsigned('0' & OP2(7 downto 4)) - unsigned('0' & OP1(7 downto 4)) - ("0000" & C_0);
+                TEMP1 := unsigned("00" & OP2(7 downto 4)) - unsigned("00" & OP1(7 downto 4)) - ("0000" & C_0);
         end case;
 
-        if Std_Logic_Vector(TEMP1) > "01001" then
+        if OP = ABCD and Std_Logic_Vector(TEMP1) > "001001" then
+            Z_1 := "0110";
+            C_1 := '1';
+        elsif (OP = NBCD or OP = SBCD) and Std_Logic_Vector(TEMP1) > "001111" then
             Z_1 := "0110";
             C_1 := '1';
         else
@@ -310,7 +369,7 @@ begin
                 S_1 := TEMP1(3 downto 0) - Z_1;
                 S_0 := TEMP0(3 downto 0) - Z_0;
         end case;           
-        --
+
         CB_BCD <= C_1;
         RESULT_BCDOP(7 downto 4) <= Std_Logic_Vector(S_1);
         RESULT_BCDOP(3 downto 0) <= Std_Logic_Vector(S_0);
@@ -319,70 +378,99 @@ begin
     BF_DATA_IN <= OP3 & OP2(7 downto 0);
 
     P_BITFIELD_OP: process(BF_DATA_IN, BF_LOWER_BND, BF_OFFSET, BF_UPPER_BND, BF_WIDTH, BIW_1, OP, OP1)
-        variable BF_NZ      : boolean;
-        variable BFFFO_CNT  : std_logic_vector(5 downto 0);
+    variable BF_NZ     : boolean;
+    variable BITFIELD : std_logic_vector(39 downto 8);
+    variable BFFFO_CNT : std_logic_vector(5 downto 0);
     begin
         RESULT_BITFIELD <= BF_DATA_IN; -- Default.
+        BITFIELD := (others => '0');
+        BF_NZ := false;
+        BFFFO_CNT := "000000";
         case OP is
-            when BFCHG =>
+            when BFCHG =>            
                 for i in RESULT_BITFIELD'range loop
-                    if i >= BF_LOWER_BND and i <= BF_UPPER_BND then
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i >= BF_LOWER_BND or (i <= BF_UPPER_BND and i > 7) then
+                            RESULT_BITFIELD(i) <= not BF_DATA_IN(i);
+                        end if;
+                    elsif i >= BF_LOWER_BND and i <= BF_UPPER_BND then
                         RESULT_BITFIELD(i) <= not BF_DATA_IN(i);
                     end if;
                 end loop;
             when BFCLR =>
                 for i in RESULT_BITFIELD'range loop
-                    if i >= BF_LOWER_BND and i <= BF_UPPER_BND then
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i >= BF_LOWER_BND or (i <= BF_UPPER_BND and i > 7) then
+                            RESULT_BITFIELD(i) <= '0';
+                        end if;
+                    elsif i >= BF_LOWER_BND and i <= BF_UPPER_BND then
                         RESULT_BITFIELD(i) <= '0';
                     end if;
                 end loop;
-            when BFEXTS => -- Result is in (39 downto 8).
-                for i in 31 downto 0 loop
-                    if i <= BF_WIDTH - 1 and BF_LOWER_BND + i <= 39 then
-                        RESULT_BITFIELD(i + 8) <= BF_DATA_IN(BF_LOWER_BND + i);
+            when BFEXTS | BFEXTU => -- Result is in (39 downto 8).
+                for i in RESULT_BITFIELD'range loop
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i <= BF_UPPER_BND and i > 7 then
+                            RESULT_BITFIELD((7 + BF_WIDTH) - (BF_UPPER_BND - i)) <= BF_DATA_IN(i);
+                        elsif i >= BF_LOWER_BND then
+                            RESULT_BITFIELD(((7 + BF_WIDTH) - (BF_UPPER_BND - 7)) - (39 - i)) <= BF_DATA_IN(i);
+                        end if;
+                    elsif i <= BF_UPPER_BND and i >= BF_LOWER_BND then
+                        RESULT_BITFIELD(BF_WIDTH + 7 - (BF_UPPER_BND - i)) <= BF_DATA_IN(i);
                     end if;
                 end loop;
-                --
+
+                -- At this point we have the bit field adjusted to the right in the RESULT_BITFIELD signal.
+
                 for i in RESULT_BITFIELD'range loop
-                    if i >= 8 + BF_WIDTH then
+                    if OP = BFEXTS and i >= 8 + BF_WIDTH then
                         RESULT_BITFIELD(i) <= BF_DATA_IN(BF_UPPER_BND);
-                    end if;
-                end loop;
-            when BFEXTU => -- Result is in (39 downto 8).
-                for i in 31 downto 0 loop
-                    if i <= BF_WIDTH - 1 and BF_LOWER_BND + i <= 39 then
-                        RESULT_BITFIELD(i + 8) <= BF_DATA_IN(BF_LOWER_BND + i);
-                    end if;
-                end loop;
-                --
-                for i in RESULT_BITFIELD'range loop
-                    if i >= 8 + BF_WIDTH then
+                    elsif OP = BFEXTU and i >= 8 + BF_WIDTH then
                         RESULT_BITFIELD(i) <= '0';
                     end if;
                 end loop;
             when BFFFO => -- Result is in (39 downto 8).
-                BF_NZ := false;
-                BFFFO_CNT := "000000";
-                for i in BF_DATA_IN'range loop
-                    if i <= BF_UPPER_BND and i >= BF_LOWER_BND then
-                        if BF_DATA_IN(i) = '0' and BF_NZ = false then
-                            BFFFO_CNT := BFFFO_CNT + '1';
-                        else
-                            BF_NZ := true;
+                for i in RESULT_BITFIELD'range loop
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i <= BF_UPPER_BND and i > 7 then
+                            BITFIELD((7 + BF_WIDTH) - (BF_UPPER_BND - i)) := BF_DATA_IN(i);
+                        elsif i >= BF_LOWER_BND then
+                            BITFIELD(((7 + BF_WIDTH) - (BF_UPPER_BND - 7)) - (39 - i)) := BF_DATA_IN(i);
                         end if;
+                    elsif i <= BF_UPPER_BND and i >= BF_LOWER_BND then
+                        BITFIELD(BF_WIDTH + 7 - (BF_UPPER_BND - i)) := BF_DATA_IN(i);
                     end if;
                 end loop;
-                --
-                RESULT_BITFIELD <= (BF_OFFSET + BFFFO_CNT) & x"00";
+
+                -- At this point we have the bit field adjusted to the right in the BITFIELD variable.
+
+                for i in BITFIELD' range loop
+                    if i - 8 < BF_WIDTH and BITFIELD(i) = '0' and BF_NZ = false then
+                        BFFFO_CNT := BFFFO_CNT + '1';
+                    elsif i - 8 < BF_WIDTH then
+                        BF_NZ := true;
+                    end if;
+                    RESULT_BITFIELD <= (BF_OFFSET + BFFFO_CNT) & x"00";
+                end loop;
             when BFINS =>
                 for i in RESULT_BITFIELD'range loop
-                    if i <= BF_WIDTH - 1 and (BF_UPPER_BND - i) >= 0 then
-                        RESULT_BITFIELD(BF_UPPER_BND - i) <= OP1(BF_WIDTH - i - 1);
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i >= BF_LOWER_BND then
+                            RESULT_BITFIELD(i) <= OP1(i - BF_LOWER_BND);
+                        elsif i <= BF_UPPER_BND and i > 7 then
+                            RESULT_BITFIELD(i) <= OP1(32 + i - BF_LOWER_BND); -- (i - 8 + 1 + 39 - BF_LOWER_BND).
+                        end if;
+                    elsif i >= BF_LOWER_BND and i <= BF_UPPER_BND then
+                        RESULT_BITFIELD(i) <= OP1(i - BF_LOWER_BND);
                     end if;
                 end loop;
             when BFSET =>
                 for i in RESULT_BITFIELD'range loop
-                    if i >= BF_LOWER_BND and i <= BF_UPPER_BND then
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i >= BF_LOWER_BND or (i <= BF_UPPER_BND and i > 7) then
+                            RESULT_BITFIELD(i) <= '1';
+                        end if;
+                    elsif i >= BF_LOWER_BND and i <= BF_UPPER_BND then
                         RESULT_BITFIELD(i) <= '1';
                     end if;
                 end loop;
@@ -392,7 +480,7 @@ begin
     end process P_BITFIELD_OP;
 
     P_BITOP: process(BITPOS, OP, OP2)
-        -- Bit manipulation operations.
+    -- Bit manipulation operations.
     begin
         RESULT_BITOP <= OP2; -- The default is the unmanipulated data.
         --
@@ -409,42 +497,42 @@ begin
     end process P_BITOP;
 
     DIVISION: process
-        variable BITCNT         : integer range 0 to 64;
-        variable DIVIDEND       : unsigned(63 downto 0);
-        variable DIVISOR        : unsigned(31 downto 0);
-        variable QUOTIENT_REST  : unsigned(31 downto 0);
-        variable QUOTIENT_VAR   : unsigned(31 downto 0);
-        variable REMAINDER_REST : unsigned(31 downto 0);
-        variable REMAINDER_VAR  : unsigned(31 downto 0);
-        -- Be aware, that the destination and source operands
-        -- may be reloaded during the division operation. For
-        -- this, we use the restore values in case of an overflow.
+    variable BITCNT         : integer range 0 to 64;
+    variable DIVIDEND       : unsigned(63 downto 0);
+    variable DIVISOR        : unsigned(31 downto 0);
+    variable QUOTIENT_REST  : unsigned(31 downto 0);
+    variable QUOTIENT_VAR   : unsigned(31 downto 0);
+    variable REMAINDER_REST : unsigned(31 downto 0);
+    variable REMAINDER_VAR  : unsigned(31 downto 0);
+    -- Be aware, that the destination and source operands
+    -- may be reloaded during the division operation. For
+    -- this, we use the restore values in case of an overflow.
     begin
         wait until CLK = '1' and CLK' event;
         DIV_RDY <= '0';
         case DIV_STATE is 
             when IDLE => 
-                if (OP_IN = DIVS or OP_IN = DIVU) and ALU_INIT = '1' then 
+                if ALU_INIT = '1' and (OP_IN = DIVS or OP_IN = DIVU) then 
                     DIV_STATE <= INIT; 
                 end if;
             when INIT =>
                 if OP = DIVS and OP_SIZE = LONG and BIW_1(10) = '1' and OP3(31) = '1' then -- 64 bit signed negative dividend.
                     DIVIDEND := unsigned(not (OP3 & OP2) + '1');
-                elsif (OP = DIVS or OP = DIVU) and OP_SIZE = LONG and BIW_1(10) = '1' then -- 64 bit posiive or unsigned dividend.
+                elsif (OP = DIVS or OP = DIVU) and OP_SIZE = LONG and BIW_1(10) = '1' then -- 64 bit positive or unsigned dividend.
                     DIVIDEND := unsigned(OP3 & OP2);
                 elsif OP = DIVS and OP2(31) = '1' then -- 32 bit signed negative dividend.
                     DIVIDEND := x"00000000" & unsigned(not(OP2) + '1');
-                else -- 32 bit posiive or unsigned dividend.
+                else -- 32 bit positive or unsigned dividend.
                     DIVIDEND := x"00000000" & unsigned(OP2);
                 end if;
 
                 if OP = DIVS and OP_SIZE = LONG and OP1(31) = '1' then -- 32 bit signed negative divisor.
                     DIVISOR := unsigned(not OP1 + '1');
-                elsif OP_SIZE = LONG then -- 32 bit posiive or unsigned divisor.
+                elsif OP_SIZE = LONG then -- 32 bit positive or unsigned divisor.
                     DIVISOR := unsigned(OP1);
                 elsif OP = DIVS and OP_SIZE = WORD and OP1(15) = '1' then -- 16 bit signed negative divisor.
                     DIVISOR := x"0000" & unsigned(not OP1(15 downto 0) + '1');
-                else -- 16 bit posiive or unsigned divisor.
+                else -- 16 bit positive or unsigned divisor.
                     DIVISOR := x"0000" & unsigned(OP1(15 downto 0));
                 end if;
 
@@ -455,7 +543,11 @@ begin
 
                 REMAINDER <= (others => '0');
                 REMAINDER_VAR := (others => '0');
-                REMAINDER_REST := unsigned(OP3);
+
+                case OP_SIZE is
+                    when LONG => REMAINDER_REST := unsigned(OP3);
+                    when others => REMAINDER_REST := unsigned(x"0000" & OP2(31 downto 16));
+                end case;
 
                 if OP_SIZE = LONG and BIW_1(10) = '1' then
                     BITCNT := 64;
@@ -464,16 +556,13 @@ begin
                 end if;
 
                 if DIVISOR = x"00000000" then -- Division by zero.
-                    QUOTIENT <= (others => '1');
-                    REMAINDER <= (others => '1');
-                    DIV_STATE <= IDLE;
-                    DIV_RDY <= '1';
-                elsif x"00000000" & DIVISOR > DIVIDEND then -- Divisor > dividend.
-                    REMAINDER <= DIVIDEND(31 downto 0);
-                    DIV_STATE <= IDLE;
-                    DIV_RDY <= '1';
-                elsif x"00000000" & DIVISOR = DIVIDEND then -- Result is 1.
-                    QUOTIENT <= x"00000001";
+                    if OP_SIZE = WORD then
+                        QUOTIENT <= unsigned(x"0000" & OP2(15 downto 0));
+                        REMAINDER <= unsigned(x"0000" & OP2(31 downto 16));
+                    else
+                        QUOTIENT <= unsigned(OP2);
+                        REMAINDER <= unsigned(OP3);
+                    end if;
                     DIV_STATE <= IDLE;
                     DIV_RDY <= '1';
                 else
@@ -490,7 +579,7 @@ begin
                     DIV_RDY <= '1';
                     QUOTIENT <= QUOTIENT_REST;
                     REMAINDER <= REMAINDER_REST;
-                elsif OP_SIZE = WORD and BITCNT > 15 then -- Division overflow in 64 bit mode.
+                elsif OP_SIZE = WORD and BITCNT > 15 then -- Division overflow in 32 bit mode.
                     VFLAG_DIV <= '1';
                     DIV_STATE <= IDLE;
                     DIV_RDY <= '1';
@@ -513,26 +602,55 @@ begin
                         QUOTIENT <= QUOTIENT_VAR;
                     end if;
                     --
-                    REMAINDER <= REMAINDER_VAR;
+                    if OP = DIVS and OP_SIZE = LONG and BIW_1(10) = '1' and OP3(31) = '1' then -- 64 bit signed negative dividend.
+                        REMAINDER <= not REMAINDER_VAR + 1;
+                    elsif OP = DIVS and OP_SIZE = LONG and BIW_1(10) = '0' and OP2(31) = '1' then -- 64 bit signed negative dividend.
+                        REMAINDER <= not REMAINDER_VAR + 1;
+                    elsif OP = DIVS and OP_SIZE = WORD and OP2(31) = '1' then -- 32 bit signed negative dividend.
+                        REMAINDER <= not REMAINDER_VAR + 1;
+                    else -- 32 bit positive or unsigned dividend.
+                        REMAINDER <= REMAINDER_VAR;
+                    end if;
+
+                    -- The following is the final overflow detection for signed logic.
+                    if OP = DIVS and OP_SIZE = LONG and QUOTIENT_VAR(31 downto 0) = x"80000000" then
+                        null; -- x"80000000" is self-mapping.
+                    elsif OP = DIVS and OP_SIZE = LONG and QUOTIENT_VAR(31) = '1' then
+                        VFLAG_DIV <= '1';
+                        QUOTIENT <= QUOTIENT_REST;
+                        REMAINDER <= REMAINDER_REST;
+                    elsif OP = DIVS and OP_SIZE = WORD and QUOTIENT_VAR(15 downto 0) = X"8000" then
+                        null; -- x"8000" is self-mapping.
+                    elsif OP = DIVS and OP_SIZE = WORD and QUOTIENT_VAR(15) = '1' then
+                        VFLAG_DIV <= '1';
+                        QUOTIENT <= QUOTIENT_REST;
+                        REMAINDER <= REMAINDER_REST;
+                    end if;
+
                     DIV_RDY <= '1';
                     DIV_STATE <= IDLE;
                 end if;
             end case;
     end process DIVISION;
 
-    P_INTOP: process(OP, OP1_SIGNEXT, OP2, OP2_SIGNEXT, ADR_MODE, STATUS_REG, RESULT_INTOP)
-        -- The integer arithmetics ADD, SUB, NEG and CMP in their different variations are modelled here.
-        variable X_IN_I         : Std_Logic_Vector(0 downto 0);
-        variable RESULT         : unsigned(31 downto 0);
+    P_INTOP: process(OP, OP1, OP1_SIGNEXT, OP2, OP2_SIGNEXT, ADR_MODE, X_IN, RESULT_INTOP)
+    -- The integer arithmetics ADD, SUB, NEG and CMP in their different variations are modelled here.
+    variable X_IN_I         : Std_Logic_Vector(0 downto 0);
+    variable RESULT         : unsigned(31 downto 0);
     begin
-        X_IN_I(0) := STATUS_REG(4); -- Extended Flag.
+        X_IN_I(0) := X_IN; -- Extended Flag.
         case OP is
             when ADDA => -- No sign extension for the destination.
                 RESULT := unsigned(OP2) + unsigned(OP1_SIGNEXT);
             when ADDQ =>
                 case ADR_MODE is
-                    when "001" => RESULT := unsigned(OP2) + unsigned(OP1_SIGNEXT); -- No sign extension for address destination.
-                    when others => RESULT := unsigned(OP2_SIGNEXT) + unsigned(OP1_SIGNEXT);
+                    when "001" => RESULT := unsigned(OP2) + unsigned(OP1); -- No sign extension for address destination.
+                    when others => RESULT := unsigned(OP2_SIGNEXT) + unsigned(OP1);
+                end case;
+            when SUBQ =>
+                case ADR_MODE is
+                    when "001" => RESULT := unsigned(OP2) - unsigned(OP1); -- No sign extension for address destination.
+                    when others => RESULT := unsigned(OP2_SIGNEXT) - unsigned(OP1);
                 end case;
             when ADD | ADDI =>
                 RESULT := unsigned(OP2_SIGNEXT) + unsigned(OP1_SIGNEXT);
@@ -540,19 +658,14 @@ begin
                 RESULT := unsigned(OP2_SIGNEXT) + unsigned(OP1_SIGNEXT) + unsigned(X_IN_I);
             when CMPA | DBcc | SUBA => -- No sign extension for the destination.
                 RESULT := unsigned(OP2) - unsigned(OP1_SIGNEXT);
-            when SUBQ =>
-                case ADR_MODE is
-                    when "001" => RESULT := unsigned(OP2) - unsigned(OP1_SIGNEXT); -- No sign extension for address destination.
-                    when others => RESULT := unsigned(OP2_SIGNEXT) - unsigned(OP1_SIGNEXT);
-                end case;
             when CAS | CAS2 | CMP | CMPI | CMPM | SUB | SUBI =>
                 RESULT := unsigned(OP2_SIGNEXT) - unsigned(OP1_SIGNEXT);
             when SUBX =>
                 RESULT := unsigned(OP2_SIGNEXT) - unsigned(OP1_SIGNEXT) - unsigned(X_IN_I);
             when NEG =>
-                RESULT := x"00000000" - unsigned(OP2_SIGNEXT);
+                RESULT := unsigned(OP1_SIGNEXT) - unsigned(OP2_SIGNEXT);
             when NEGX =>
-                RESULT := x"00000000" - unsigned(OP2_SIGNEXT) - unsigned(X_IN_I);
+                RESULT := unsigned(OP1_SIGNEXT) - unsigned(OP2_SIGNEXT) - unsigned(X_IN_I);
             when CLR =>
                 RESULT := (others => '0');
             when others =>
@@ -562,10 +675,10 @@ begin
     end process P_INTOP;
 
     P_LOGOP: process(OP, OP1, OP2)
-        -- This process provides the logic operations:
-        -- AND, OR, XOR and NOT.
-        -- The logic operations require no signed / unsigned
-        -- modelling.
+    -- This process provides the logic operations:
+    -- AND, OR, XOR and NOT.
+    -- The logic operations require no signed / unsigned
+    -- modelling.
     begin
         case OP is
             when AND_B | ANDI | ANDI_TO_CCR | ANDI_TO_SR =>
@@ -580,11 +693,12 @@ begin
     end process P_LOGOP;
 
     RESULT_MUL <= Std_Logic_Vector(signed(OP1_SIGNEXT) * signed(OP2_SIGNEXT)) when OP = MULS else
-                  Std_Logic_Vector(unsigned(OP1) * unsigned(OP2));
+                  Std_Logic_Vector(unsigned(OP1) * unsigned(OP2)) when OP_SIZE = LONG else
+                  Std_Logic_Vector(unsigned(x"0000" & OP1(15 downto 0)) * unsigned(x"0000" & OP2(15 downto 0)));
 
-    P_OTHERS: process(ALU_COND_I, BIW_0, OP3, OP2, OP2_SIGNEXT, OP, OP_SIZE, OP1, OP1_SIGNEXT, HILOn)
-        -- This process provides the calculation for special operations.
-        variable RESULT : unsigned(31 downto 0);
+    P_OTHERS: process(ADR_MODE, ALU_COND_I, BIW_0, BIW_1, OP, OP1, OP2, OP3, OP1_SIGNEXT, OP_SIZE, HILOn)
+    -- This process provides the calculation for special operations.
+    variable RESULT : unsigned(31 downto 0);
     begin
         RESULT := (others => '0');
         case OP is
@@ -614,6 +728,8 @@ begin
                     RESULT(i) := OP2(7);
                 end loop;
                 RESULT(7 downto 0) := unsigned(OP2(7 downto 0));
+            when JSR =>
+                RESULT := unsigned(OP1) + "10"; -- Add offset of two to the Pointer of the last extension word.
             when MOVEQ =>
                 for i in 31 downto 8 loop
                     RESULT(i) := OP1(7);
@@ -635,16 +751,30 @@ begin
                 RESULT := x"0000" & (unsigned(OP1(15 downto 0)) + unsigned(x"0" & OP2(7 downto 4) & x"0" & OP2(3 downto 0)));
             when LINK | TST =>
                 RESULT := unsigned(OP2);
-            when others => -- MOVE_FROM_CCR, MOVE_TO_CCR, MOVE_FROM_SR, MOVE_TO_SR, MOVE, MOVEA, MOVEC, MOVEM, MOVEP, MOVES, PMOVE, STOP.
+            when MOVEA | MOVEM =>
+                RESULT := unsigned(OP1_SIGNEXT);
+            when MOVES =>
+                if ADR_MODE = "011" and BIW_1(15) = '1' and BIW_1(11) = '1' and BIW_1(14 downto 12) = BIW_0(2 downto 0) then
+                    -- This logic provides the incremented address register in case of ax,(ax)+ addressing mode.
+                    -- Thus, the value written to memory is the incremented address.
+                    case OP_SIZE is
+                        when LONG => RESULT := unsigned(OP1_SIGNEXT) + "100";
+                        when WORD => RESULT := unsigned(OP1_SIGNEXT) + "010";
+                        when BYTE => RESULT := unsigned(OP1_SIGNEXT) + "001";
+                    end case;
+                else
+                    RESULT := unsigned(OP1_SIGNEXT);
+                end if;
+            when others => -- MOVE_FROM_CCR, MOVE_TO_CCR, MOVE_FROM_SR, MOVE_TO_SR, MOVE, MOVEC, MOVEP, STOP.
                 RESULT := unsigned(OP1);
         end case;
         RESULT_OTHERS <= Std_Logic_Vector(RESULT);
     end process P_OTHERS;
 
-    SHFT_LOAD <= '1' when (OP_IN = ASL or OP_IN = ASR) and ALU_INIT = '1' else
-                 '1' when (OP_IN = LSL or OP_IN = LSR) and ALU_INIT = '1' else
-                 '1' when (OP_IN = ROTL or OP_IN = ROTR) and ALU_INIT = '1' else
-                 '1' when (OP_IN = ROXL or OP_IN = ROXR) and ALU_INIT = '1' else '0';
+    SHFT_LOAD <= '1' when ALU_INIT = '1' and (OP_IN = ASL or OP_IN = ASR) else
+                 '1' when ALU_INIT = '1' and (OP_IN = LSL or OP_IN = LSR) else
+                 '1' when ALU_INIT = '1' and (OP_IN = ROTL or OP_IN = ROTR) else
+                 '1' when ALU_INIT = '1' and (OP_IN = ROXL or OP_IN = ROXR) else '0';
 
     SHIFT_WIDTH_IN <= "000001" when BIW_0_IN(7 downto 6) = "11" else -- Memory shifts.
                       "001000" when BIW_0_IN(5) = '0' and BIW_0_IN(11 downto 9) = "000" else -- Direct.
@@ -654,14 +784,16 @@ begin
     P_SHFT_CTRL: process
     -- The variable shift or rotate length requires a control
     -- to achieve the correct OPERAND manipulation.
-    variable BIT_CNT	: std_logic_vector(5 downto 0);
+    variable BIT_CNT    : std_logic_vector(5 downto 0);
     begin
         wait until CLK = '1' and CLK' event;
 
         SHFT_RDY <= '0';
         
         if SHIFT_STATE = IDLE then
-            if SHFT_LOAD = '1' and SHIFT_WIDTH_IN /= "000000" then
+            if SHFT_LOAD = '1' and SHIFT_WIDTH_IN = "000000" then
+                SHFT_RDY <= '1';
+            elsif SHFT_LOAD = '1' then
                 SHIFT_STATE <= RUN;
                 BIT_CNT := SHIFT_WIDTH_IN;
                 SHFT_EN <= '1';
@@ -673,7 +805,6 @@ begin
         elsif SHIFT_STATE = RUN then
             if BIT_CNT = "000001" then
                 SHIFT_STATE <= IDLE;
-                BIT_CNT := SHIFT_WIDTH;
                 SHFT_EN <= '0';
                 SHFT_RDY <= '1';
             else
@@ -765,74 +896,100 @@ begin
     P_OUT: process
     begin
         wait until CLK = '1' and CLK' event;
-        case OP is
-            when ABCD | NBCD | SBCD => 
-                RESULT <= x"00000000000000" & RESULT_BCDOP; -- Byte only.
-            when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFINS | BFSET | BFTST => 
-                case HILOn is
-                    when '1' => RESULT <= x"00000000" & RESULT_BITFIELD(39 downto 8);
-                    when others => RESULT <= x"00000000000000" & RESULT_BITFIELD(7 downto 0);
-                end case;
-            when BCHG | BCLR | BSET | BTST =>
-                RESULT <= x"00000000" & RESULT_BITOP;
-            when ADD | ADDA | ADDI | ADDQ | ADDX | CLR | CMP | CMPA | CMPI =>
-                RESULT <= x"00000000" & RESULT_INTOP;
-            when CMPM | DBcc | NEG | NEGX | SUB | SUBA | SUBI | SUBQ | SUBX =>
-                RESULT <= x"00000000" & RESULT_INTOP;
-            when AND_B | ANDI | ANDI_TO_CCR | ANDI_TO_SR | EOR | EORI | EORI_TO_CCR =>
-                RESULT <= x"00000000" & RESULT_LOGOP;
-            when EORI_TO_SR | NOT_B | OR_B | ORI | ORI_TO_CCR | ORI_TO_SR =>
-                RESULT <= x"00000000" & RESULT_LOGOP;
-            when ASL | ASR | LSL | LSR | ROTL | ROTR | ROXL | ROXR =>
-                RESULT <= x"00000000" & RESULT_SHIFTOP;
-            when DIVS | DIVU =>
-                case OP_SIZE is
-                    when LONG => RESULT <= Std_Logic_Vector(REMAINDER) & Std_Logic_Vector(QUOTIENT);
-                    when others => RESULT <= x"00000000" & Std_Logic_Vector(REMAINDER(15 downto 0)) & Std_Logic_Vector(QUOTIENT(15 downto 0));
-                end case;
-            when MULS | MULU =>
-                RESULT <= RESULT_MUL;
-            when PACK =>
-                RESULT <= x"00000000000000" & RESULT_OTHERS(11 downto 8) & RESULT_OTHERS (3 downto 0);
-            when others =>
-                RESULT <= x"00000000" & RESULT_OTHERS;
-        end case;
-        --
+        if ALU_REQ = '1' then
+            case OP is
+                when ABCD | NBCD | SBCD => 
+                    RESULT <= x"00000000000000" & RESULT_BCDOP; -- Byte only.
+                when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFINS | BFSET | BFTST => 
+                    case HILOn is
+                        when '1' => RESULT <= x"00000000" & RESULT_BITFIELD(39 downto 8);
+                        when others => RESULT <= x"00000000000000" & RESULT_BITFIELD(7 downto 0);
+                    end case;
+                when BCHG | BCLR | BSET | BTST =>
+                    RESULT <= x"00000000" & RESULT_BITOP;
+                when ADD | ADDA | ADDI | ADDQ | ADDX | CLR | CMP | CMPA | CMPI =>
+                    RESULT <= x"00000000" & RESULT_INTOP;
+                when CMPM | DBcc | NEG | NEGX | SUB | SUBA | SUBI | SUBQ | SUBX =>
+                    RESULT <= x"00000000" & RESULT_INTOP;
+                when AND_B | ANDI | EOR | EORI | NOT_B | OR_B | ORI =>
+                    RESULT <= x"00000000" & RESULT_LOGOP;
+                when ANDI_TO_SR | EORI_TO_SR | ORI_TO_SR => -- Used for branch prediction.
+                    RESULT <= x"00000000" & RESULT_LOGOP;
+                when ASL | ASR | LSL | LSR | ROTL | ROTR | ROXL | ROXR =>
+                    RESULT <= x"00000000" & RESULT_SHIFTOP;
+                when DIVS | DIVU =>
+                    case OP_SIZE is
+                        when LONG => RESULT <= Std_Logic_Vector(REMAINDER) & Std_Logic_Vector(QUOTIENT);
+                        when others => RESULT <= x"00000000" & Std_Logic_Vector(REMAINDER(15 downto 0)) & Std_Logic_Vector(QUOTIENT(15 downto 0));
+                    end case;
+                when MULS | MULU =>
+                    if OP_SIZE = LONG and BIW_1(10) = '1' and BIW_1(14 downto 12) = BIW_1(2 downto 0) then
+                        -- Special case: when the operation is in the 64 bits result mode
+                        -- but we have only one register the higher portion of the result
+                        -- is written back.
+                        RESULT <= RESULT_MUL(63 downto 32) & RESULT_MUL(63 downto 32);
+                    elsif OP_SIZE = LONG and BIW_1(10) = '0' then
+                        -- Special case: when we are in the LONG, 32 bit result mode
+                        -- then the higher portion is discarded and the lower portion
+                        -- is written back.
+                        RESULT <= RESULT_MUL(31 downto 0) & RESULT_MUL(31 downto 0);
+                    else
+                        RESULT <= RESULT_MUL;
+                    end if;
+                when PACK =>
+                    RESULT <= x"00000000000000" & RESULT_OTHERS(11 downto 8) & RESULT_OTHERS (3 downto 0);
+                when others =>
+                    RESULT <= OP2 & RESULT_OTHERS; -- OP2 is used for EXG.
+            end case;
+        end if;
     end process P_OUT;
 
-    -- Out of bounds condition:
     CHK_CMP_COND <= true when OP = CHK and OP2_SIGNEXT(MSB) = '1' else -- Negative destination.
                     true when OP = CHK and signed(OP2_SIGNEXT) > signed(OP1_SIGNEXT) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and OP2 < OP1 else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and OP2 > OP3 else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and OP2(15 downto 0) < OP1(15 downto 0) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and OP2(15 downto 0) > OP3(15 downto 0) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP2(7 downto 0) < OP1(7 downto 0) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP2(7 downto 0) > OP3(7 downto 0) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and signed(OP2_SIGNEXT) < signed(OP1_SIGNEXT) else
-                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and signed(OP2_SIGNEXT) > signed(OP3_SIGNEXT) else false;
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and unsigned(OP3) >= unsigned(OP1) and unsigned(OP2) < unsigned(OP1) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and unsigned(OP3) >= unsigned(OP1) and unsigned(OP2) > unsigned(OP3) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and signed(OP3) >= signed(OP1) and signed(OP2) < signed(OP1) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and signed(OP3) >= signed(OP1) and signed(OP2) > signed(OP3) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = LONG and unsigned(OP3) < unsigned(OP1) and signed(OP3) < signed(OP1) and signed(OP2) > signed(OP3) and signed(OP2) < signed(OP1) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and unsigned(OP3(15 downto 0)) >= unsigned(OP1(15 downto 0)) and unsigned(OP2(15 downto 0)) < unsigned(OP1(15 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and unsigned(OP3(15 downto 0)) >= unsigned(OP1(15 downto 0)) and unsigned(OP2(15 downto 0)) > unsigned(OP3(15 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and signed(OP3(15 downto 0)) >= signed(OP1(15 downto 0)) and signed(OP2(15 downto 0)) < signed(OP1(15 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and signed(OP3(15 downto 0)) >= signed(OP1(15 downto 0)) and signed(OP2(15 downto 0)) > signed(OP3(15 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = WORD and unsigned(OP3(15 downto 0)) < unsigned(OP1(15 downto 0)) and signed(OP3(15 downto 0)) < signed(OP1(15 downto 0)) and signed(OP2(15 downto 0)) > signed(OP3(15 downto 0)) and signed(OP2(15 downto 0)) < signed(OP1(15 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = BYTE and unsigned(OP3(7 downto 0)) >= unsigned(OP1(7 downto 0)) and unsigned(OP2(7 downto 0)) < unsigned(OP1(7 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = BYTE and unsigned(OP3(7 downto 0)) >= unsigned(OP1(7 downto 0)) and unsigned(OP2(7 downto 0)) > unsigned(OP3(7 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = BYTE and signed(OP3(7 downto 0)) >= signed(OP1(7 downto 0)) and signed(OP2(7 downto 0)) < signed(OP1(7 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = BYTE and signed(OP3(7 downto 0)) >= signed(OP1(7 downto 0)) and signed(OP2(7 downto 0)) > signed(OP3(7 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '1' and OP_SIZE = BYTE and unsigned(OP3(7 downto 0)) < unsigned(OP1(7 downto 0)) and signed(OP3(7 downto 0)) < signed(OP1(7 downto 0)) and signed(OP2(7 downto 0)) > signed(OP3(7 downto 0)) and signed(OP2(7 downto 0)) < signed(OP1(7 downto 0)) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and unsigned(OP3_SIGNEXT) >= unsigned(OP1_SIGNEXT) and unsigned(OP2) < unsigned(OP1_SIGNEXT) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and unsigned(OP3_SIGNEXT) >= unsigned(OP1_SIGNEXT) and unsigned(OP2) > unsigned(OP3_SIGNEXT) else 
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and signed(OP3_SIGNEXT) >= signed(OP1_SIGNEXT) and signed(OP2) < signed(OP1_SIGNEXT) else
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and signed(OP3_SIGNEXT) >= signed(OP1_SIGNEXT) and signed(OP2) > signed(OP3_SIGNEXT) else 
+                    true when (OP = CHK2 or OP = CMP2) and CHK2CMP2_DR = '0' and unsigned(OP3_SIGNEXT) < unsigned(OP1_SIGNEXT) and signed(OP3_SIGNEXT) < signed(OP1_SIGNEXT) and signed(OP2) > signed(OP3_SIGNEXT) and signed(OP2) < signed(OP1_SIGNEXT) else false;
 
     -- All traps must be modeled as strobes.
     TRAP_CHK <= '1' when ALU_ACK = '1' and (OP = CHK or OP = CHK2) and CHK_CMP_COND = true else '0';
-    TRAP_DIVZERO <= '1' when ALU_INIT = '1' and (OP_IN = DIVS or OP_IN = DIVU) and OP1_IN = x"00000000" else '0';
-    
-    COND_CODES: process(BF_DATA_IN, BF_LOWER_BND, BF_UPPER_BND, BIW_1, BITPOS, CB_BCD, CHK_CMP_COND, CLK, OP1, OP1_SIGNEXT, OP2, OP2_SIGNEXT,
-                        OP3, OP3_SIGNEXT, MSB, OP, OP_SIZE, QUOTIENT, RESULT_BCDOP, RESULT_INTOP, RESULT_LOGOP, RESULT_MUL, RESULT_SHIFTOP, 
-                        RESULT_OTHERS, SHIFT_WIDTH, STATUS_REG, USE_DREG, VFLAG_DIV, XFLAG_SHFT)
-        -- In this process all the condition codes X (eXtended), N (Negative)
-        -- Z (Zero), V (oVerflow) and C (Carry / borrow) are calculated for
-        -- all integer operations. Except for the MULS, MULU, DIVS, DIVU the
-        -- new conditions are valid one clock cycle after the operation starts.
-        -- For the multiplication and the division, the codes are valid after
-        -- BUSY is released.
-        variable TMP            : std_logic;
-        variable Z, RM, SM, DM  : std_logic;
-        variable CFLAG_SHFT     : std_logic;
-        variable VFLAG_SHFT     : std_logic;
-        variable NFLAG_DIV      : std_logic;
-        variable NFLAG_MUL      : std_logic;
-        variable VFLAG_MUL      : std_logic;
-        variable RM_SM_DM       : bit_vector(2 downto 0);
+    TRAP_DIVZERO <= '1' when ALU_INIT = '1' and (OP_IN = DIVS or OP_IN = DIVU) and OP_SIZE_IN = LONG and OP1_IN = x"00000000" else
+                    '1' when ALU_INIT = '1' and (OP_IN = DIVS or OP_IN = DIVU) and OP_SIZE_IN = WORD and OP1_IN(15 downto 0) = x"0000" else'0';
+
+    COND_CODES: process(BF_DATA_IN, BF_LOWER_BND, BF_UPPER_BND, BF_WIDTH, BIW_1, BITPOS, CB_BCD, CHK2CMP2_DR, CHK_CMP_COND, CLK, OP1, OP1_SIGNEXT, 
+                        OP2, OP2_SIGNEXT, OP3, OP3_SIGNEXT, MSB, OP, OP_SIZE, QUOTIENT, RESULT_BCDOP, RESULT_INTOP, RESULT_LOGOP, RESULT_MUL, 
+                        RESULT_SHIFTOP, RESULT_OTHERS, SHIFT_WIDTH, STATUS_REG, VFLAG_DIV, XFLAG_SHFT)
+    -- In this process all the condition codes X (eXtended), N (Negative)
+    -- Z (Zero), V (oVerflow) and C (Carry / borrow) are calculated for
+    -- all integer operations. Except for the MULS, MULU, DIVS, DIVU the
+    -- new conditions are valid one clock cycle after the operation starts.
+    -- For the multiplication and the division, the codes are valid after
+    -- BUSY is released.
+    variable TMP            : std_logic;
+    variable TMPC           : std_logic;
+    variable Z, RM, SM, DM  : std_logic;
+    variable CFLAG_SHFT     : std_logic;
+    variable VFLAG_SHFT     : std_logic;
+    variable NFLAG_DIV      : std_logic;
+    variable NFLAG_MUL      : std_logic;
+    variable VFLAG_MUL      : std_logic;
+    variable RM_SM_DM       : bit_vector(2 downto 0);
     begin
         -- Shifter C, X and V flags:
         if CLK = '1' and CLK' event then
@@ -908,10 +1065,14 @@ begin
 
         -- Integer operations:
         case OP is
-            when ADD | ADDI | ADDQ | ADDX | CMP | CMPA | CMPI | CMPM | NEG | NEGX | SUB | SUBI | SUBQ | SUBX  =>
+            when ADD | ADDI | ADDQ | ADDX | CMP | CMPI | CMPM | NEG | NEGX | SUB | SUBI | SUBQ | SUBX  =>
                 RM := RESULT_INTOP(MSB);
                 SM := OP1_SIGNEXT(MSB);
                 DM := OP2_SIGNEXT(MSB);
+            when CMPA  =>
+                RM := RESULT_INTOP(MSB);
+                SM := OP1_SIGNEXT(MSB);
+                DM := OP2(MSB);
             when others =>
                 RM := '-'; SM := '-'; DM := '-';
         end case;
@@ -921,7 +1082,9 @@ begin
         -- Multiplication:
         if OP_SIZE = LONG and BIW_1(10) = '1' and RESULT_MUL(63) = '1' then -- 64 bit result.
             NFLAG_MUL := '1';
-        elsif RESULT_MUL(31) = '1' then -- 32 bit result.
+        elsif OP_SIZE = LONG and BIW_1(10) = '0' and RESULT_MUL(31) = '1' then -- 32 bit result.
+            NFLAG_MUL := '1';
+        elsif OP_SIZE = WORD and RESULT_MUL(31) = '1' then -- 32 bit result.
             NFLAG_MUL := '1';
         else
             NFLAG_MUL := '0';
@@ -936,7 +1099,7 @@ begin
         else
             VFLAG_MUL := '0';
         end if;
-            
+
         -- The Z Flag:
         TMP := '0';
         case OP is
@@ -947,10 +1110,10 @@ begin
                     end if;
                 end loop;
                 Z := not TMP; -- Invert for Z fLAG .
-            when AND_B | ANDI | EOR | EORI | OR_B | ORI | MOVE | NOT_B | TST =>
-                for i in RESULT_OTHERS'range loop
+            when AND_B | ANDI | EOR | EORI | OR_B | ORI | NOT_B =>
+                for i in RESULT_LOGOP'range loop
                     if i <= MSB then
-                        TMP:= TMP or RESULT_OTHERS(i); -- Detect '1'.
+                        TMP:= TMP or RESULT_LOGOP(i); -- Detect '1'.
                     end if;
                 end loop;
                 Z := not TMP; -- Invert for Z fLAG .
@@ -961,29 +1124,40 @@ begin
                     end if;
                 end loop;
                 Z := not TMP; -- Invert for Z fLAG .
-            when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFINS | BFSET | BFTST =>
+            when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFSET | BFTST =>
                 for i in BF_DATA_IN'range loop
-                    if i >= BF_LOWER_BND and i <= BF_UPPER_BND then
+                    if BF_LOWER_BND > BF_UPPER_BND then -- Register rollover mode.
+                        if i >= BF_LOWER_BND or (i <= BF_UPPER_BND and i > 7) then
+                            TMP := TMP or BF_DATA_IN(i); -- Detect '1'.
+                        end if;
+                    elsif i >= BF_LOWER_BND and i <= BF_UPPER_BND then
                         TMP := TMP or BF_DATA_IN(i); -- Detect '1'.
                     end if;
                 end loop;
                 Z := not TMP;
+            when BFINS =>
+                for i in OP1'range loop
+                    if i <= BF_WIDTH -1 then
+                        TMP := TMP or OP1(i); -- Detect '1'.
+                    end if;
+                end loop;
+                Z := not TMP;
             when CHK2 | CMP2 =>
-                if USE_DREG = '1' and OP_SIZE = LONG and OP2 = OP1 then
+                if CHK2CMP2_DR = '1' and OP_SIZE = LONG and OP2 = OP1 then
                     Z := '1';
-                elsif USE_DREG = '1' and OP_SIZE = LONG and OP2 = OP3 then
+                elsif CHK2CMP2_DR = '1' and OP_SIZE = LONG and OP2 = OP3 then
                     Z:= '1';
-                elsif USE_DREG = '1' and OP_SIZE = WORD and OP2(15 downto 0) = OP1(15 downto 0) then
+                elsif CHK2CMP2_DR = '1' and OP_SIZE = WORD and OP2(15 downto 0) = OP1(15 downto 0) then
                     Z:= '1';
-                elsif USE_DREG = '1' and OP_SIZE = WORD and OP2(15 downto 0) = OP3(15 downto 0) then
+                elsif CHK2CMP2_DR = '1' and OP_SIZE = WORD and OP2(15 downto 0) = OP3(15 downto 0) then
                     Z:= '1';
-                elsif USE_DREG = '1' and OP2(7 downto 0) = OP1(7 downto 0) then
+                elsif CHK2CMP2_DR = '1' and OP_SIZE = BYTE and OP2(7 downto 0) = OP1(7 downto 0) then
                     Z:= '1';
-                elsif USE_DREG = '1' and OP2(7 downto 0) = OP3(7 downto 0) then
+                elsif CHK2CMP2_DR = '1' and OP_SIZE = BYTE and OP2(7 downto 0) = OP3(7 downto 0) then
                     Z:= '1';
-                elsif USE_DREG = '0' and OP2_SIGNEXT = OP1_SIGNEXT then
+                elsif CHK2CMP2_DR = '0' and OP2 = OP1_SIGNEXT then
                     Z := '1';
-                elsif USE_DREG = '0' and OP2_SIGNEXT = OP3_SIGNEXT then
+                elsif CHK2CMP2_DR = '0' and OP2 = OP3_SIGNEXT then
                     Z := '1';
                 else
                     Z := '0';
@@ -991,12 +1165,16 @@ begin
             when BCHG | BCLR | BSET | BTST =>
                 Z := not OP2(BITPOS);
             when DIVS | DIVU =>
-                if QUOTIENT = x"00000000" then
+                if OP_SIZE = LONG and OP1 = x"00000000" then -- Division by zero.
+                    Z := '1';
+                elsif OP_SIZE = WORD and OP1(15 downto 0) = x"0000" then -- Division by zero.
+                    Z := '1';
+                elsif QUOTIENT = x"00000000" then
                     Z := '1';
                 else
                     Z := '0';
                 end if;
-            when EXT | EXTB | SWAP =>
+            when EXT | EXTB | MOVE | SWAP | TST =>
                 for i in RESULT_OTHERS'range loop
                     if i <= MSB then
                         TMP:= TMP or RESULT_OTHERS(i); -- Detect '1'.
@@ -1022,12 +1200,25 @@ begin
                 Z := '0';
         end case;
 
+        -- For CAS and CAS2 we use this ZFLAG instead of Z not
+        -- to run into combinatorial loops.
+        TMPC := '0';
+        ZFLAG_CAS <= '0';
+        if OP = CAS or OP = CAS2 then
+            for i in RESULT_INTOP'range loop
+                if i <= MSB then
+                    TMPC := TMPC or RESULT_INTOP(i); -- Detect '1'.
+                end if;
+            end loop;
+            ZFLAG_CAS <= not TMPC; -- Invert for Z fLAG .
+        end if;
+
         case OP is
             when ABCD | NBCD | SBCD =>
                 if RESULT_BCDOP = x"00" then -- N and V are undefined, don't care.
-                    XNZVC <= CB_BCD & '-' & STATUS_REG(2) & '-' & CB_BCD;
+                    XNZVC <= CB_BCD & RESULT_BCDOP(7) & STATUS_REG(2) & '0' & CB_BCD;
                 else
-                    XNZVC <= CB_BCD & '-' & '0' & '-' & CB_BCD;
+                    XNZVC <= CB_BCD & RESULT_BCDOP(7) & '0' & '0' & CB_BCD;
                 end if;
             when ADD | ADDI | ADDQ | ADDX =>
                 if (SM = '1' and DM = '1') or (RM = '0' and SM = '1') or (RM = '0' and DM = '1') then
@@ -1053,18 +1244,18 @@ begin
                     when "100" => XNZVC(1) <= '1';
                     when others => XNZVC(1) <= '0';
                 end case;
-            when AND_B | ANDI | EOR | EORI | OR_B | ORI | MOVE | NOT_B | TST =>
-                XNZVC <= STATUS_REG(4) & RESULT_OTHERS(MSB) & Z & "00";
-            -- The ANDI_TO_CCR, ANDI_TO_SR, EORI_TO_CCR, EORI_TO_SR, ORI_TO_CCR, ORI_TO_SR
-            -- are written in the LOGOP process.
+            when AND_B | ANDI | EOR | EORI | OR_B | ORI | NOT_B =>
+                XNZVC <= STATUS_REG(4) & RESULT_LOGOP(MSB) & Z & "00";
             when ANDI_TO_CCR | EORI_TO_CCR | ORI_TO_CCR =>
                 XNZVC <= RESULT_LOGOP(4 downto 0);
             when ASL | ASR | LSL | LSR | ROTL | ROTR | ROXL | ROXR =>
                 XNZVC <= XFLAG_SHFT & RESULT_SHIFTOP(MSB) & Z & VFLAG_SHFT & CFLAG_SHFT;
             when BCHG | BCLR | BSET | BTST =>
                 XNZVC <= STATUS_REG(4 downto 3) & Z & STATUS_REG(1 downto 0);
-            when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFINS | BFSET | BFTST =>
+            when BFCHG | BFCLR | BFEXTS | BFEXTU | BFFFO | BFSET | BFTST =>
                 XNZVC <= STATUS_REG(4) & BF_DATA_IN(BF_UPPER_BND) & Z & "00";
+            when BFINS =>
+                XNZVC <= STATUS_REG(4) & OP1(BF_WIDTH -1) & Z & "00";
             when CLR =>
                 XNZVC <= STATUS_REG(4) & "0100";
             when SUB | SUBI | SUBQ | SUBX =>
@@ -1113,21 +1304,29 @@ begin
                 end if;                     
             when CHK =>
                 if OP2_SIGNEXT(MSB) = '1' then
-                    XNZVC <= STATUS_REG(4) & '1' & "000";
-                elsif CHK_CMP_COND = true then
-                    XNZVC <= STATUS_REG(4) & '0' & "000";
+                    XNZVC <= STATUS_REG(4) & "1000";
                 else
-                    XNZVC <= STATUS_REG(4 downto 3) & "000";
+                    XNZVC <= STATUS_REG(4) & "0000";
                 end if;
             when CHK2 | CMP2 =>
+                XNZVC <= STATUS_REG(4) & '0' & '0' & '0' & '0';
+
+                if Z = '1' then -- Z superseeds N because a negative zero is not defined.
+                    XNZVC(2) <= '1';
+                elsif OP_SIZE = LONG and unsigned(OP3) < unsigned(OP1) and  signed(OP3) < signed(OP1) then
+                    XNZVC(3) <= '1';
+                elsif OP_SIZE = WORD and unsigned(OP3(15 downto 0)) < unsigned(OP1(15 downto 0)) and  signed(OP3(15 downto 0)) < signed(OP1(15 downto 0)) then
+                    XNZVC(3) <= '1';
+                elsif OP_SIZE = BYTE and unsigned(OP3(7 downto 0)) < unsigned(OP1(7 downto 0)) and  signed(OP3(7 downto 0)) < signed(OP1(7 downto 0)) then
+                    XNZVC(3) <= '1';
+                end if;
+
                 if CHK_CMP_COND = true then
-                    XNZVC <= STATUS_REG(4) & '0' & '0' & '0' & '1';
-                else
-                    XNZVC <= STATUS_REG(4) & '0' & Z & '0' & '0';
+                    XNZVC(0) <= '1';
                 end if;
             when DIVS | DIVU =>
                 XNZVC <= STATUS_REG(4) & NFLAG_DIV & Z & VFLAG_DIV & '0';
-            when EXT | EXTB =>
+            when EXT | EXTB | MOVE | TST =>
                 XNZVC <= STATUS_REG(4) & RESULT_OTHERS(MSB) & Z & "00";
             when MOVEQ =>
                 if OP1_SIGNEXT(7 downto 0) = x"00" then
@@ -1161,23 +1360,21 @@ begin
         end case;
     end process COND_CODES;
 
-    CAS_CONDITIONS: process(CLK)
+    CAS_CONDITIONS: process
     begin
-        if CLK = '1' and CLK' event then
-            if LOAD_OP2 = '1' and XNZVC(2) = '1' then
-                CAS2_COND <= true;
-            elsif LOAD_OP2 = '1' then
-                CAS2_COND <= false;
-            end if;
+        wait until CLK = '1' and CLK' event;
+        if LOAD_OP2 = '1' and ZFLAG_CAS = '1' then
+            CAS2_COND <= true;
+        elsif LOAD_OP2 = '1' then
+            CAS2_COND <= false;
         end if;
     end process CAS_CONDITIONS;
 
     ALU_COND <= ALU_COND_I; -- This signal may not be registerd to meet a correct timing.
     -- Status register conditions: (STATUS_REG(4) = X, STATUS_REG(3) = N, STATUS_REG(2) = Z, STATUS_REG(1) = V, STATUS_REG(0) = C.)
     ALU_COND_I <= false when OP = CAS2 and CAS2_COND = false else
-                  true when (OP = CAS or OP = CAS2) and OP_SIZE = LONG and RESULT_INTOP = x"00000000" else
-                  true when (OP = CAS or OP = CAS2) and OP_SIZE = WORD and RESULT_INTOP (15 downto 0) = x"0000" else
-                  true when (OP = CAS or OP = CAS2) and RESULT_INTOP (7 downto 0) = x"00" else
+                  true when (OP = CAS or OP = CAS2) and ZFLAG_CAS = '1' else -- Equal.
+                  false when OP = CAS or OP = CAS2 else
                   true when OP = TRAPV and STATUS_REG(1) = '1' else
                   false when OP = TRAPV else
                   true when BIW_0(11 downto 8) = x"0" else -- True.
@@ -1199,9 +1396,11 @@ begin
                   true when BIW_0(11 downto 8) = x"F" and (STATUS_REG(3) xor STATUS_REG(1)) = '1' else false; -- Less or equal.
 
     P_STATUS_REG: process
-        -- This process is the status register with
-        -- it's related logic.
-        variable SREG_MEM : std_logic_vector(15 downto 0) := x"0000";
+    -- This process is the status register with it's related logic.
+    -- The status register is written 16 bit wide for MOVE_TO_CCR (the ALU result is 16 bit wide).
+    -- The status register is written entirely for ANDI_TO_SR, EORI_TO_SR, ORI_TO_SR.
+    -- The status register lower byte is written for ANDI_TO_CCR, EORI_TO_CCR, ORI_TO_CCR.
+    variable SREG_MEM : std_logic_vector(15 downto 0) := x"0000";
     begin
         wait until CLK = '1' and CLK' event;
         --
@@ -1211,14 +1410,18 @@ begin
         --
         if SR_INIT = '1' then
             SREG_MEM(15 downto 13) := "001"; -- Trace cleared, S = '1'.
-            SREG_MEM(10 downto 8) := IRQ_PEND;
-        elsif SR_CLR_MBIT = '1' then 
+            SREG_MEM(10 downto 8) := IRQ_PEND; -- Update IRQ level.
+        end if;
+        --
+        if SR_CLR_MBIT = '1' then 
             SREG_MEM(12) := '0';
         elsif SR_WR = '1' and OP_IN = RTE then -- Written by the exception handler, no ALU required.
             SREG_MEM := OP1_IN(15 downto 0);
-        elsif SR_WR = '1' and (OP = MOVE_TO_CCR or OP = MOVE_TO_SR or OP = STOP) then
+        elsif SR_WR = '1' and (OP_WB = MOVE_TO_CCR or OP_WB = MOVE_TO_SR or OP_WB = STOP) then
             SREG_MEM := RESULT_OTHERS(15 downto 0);
-        elsif SR_WR = '1' then
+        elsif SR_WR = '1' and (OP_WB = ANDI_TO_CCR or OP_WB = EORI_TO_CCR or OP_WB = ORI_TO_CCR) then
+            SREG_MEM(7 downto 5) := RESULT_LOGOP(7 downto 5); -- Bits 4 downto 0 are written via CC_UPDT.
+        elsif SR_WR = '1' then -- ANDI_TO_SR, EORI_TO_SR, ORI_TO_SR.
             SREG_MEM := RESULT_LOGOP(15 downto 0);
         end if;
         --

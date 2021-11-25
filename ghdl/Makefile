@@ -32,7 +32,7 @@ tb: tb.o code
 	$(GHDL) -m $(GHDLFLAGS) $@
 
 %.o: %.vhd
-	$(GHDL) -a $(GHDLFLAGS) $<
+	$(GHDL) -i $(GHDLFLAGS) $<
 
 .PHONY: run
 run: tb

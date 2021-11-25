@@ -3,7 +3,7 @@
 ---- WF68K30L IP Core: Data register logic.                         ----
 ----                                                                ----
 ---- Description:                                                   ----
----- These are the seven data registers. The logic provides two     ----
+---- These are the eight data registers. The logic provides two     ----
 ---- read and two write ports providing simultaneos access. For     ----
 ---- more information refer to the MC68030 User' Manual.            ----
 ----                                                                ----
@@ -12,7 +12,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright ï¿½ 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright © 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -52,8 +52,8 @@ entity WF68K30L_DATA_REGISTERS is
         -- Registers controls:
         DR_SEL_WR_1         : in std_logic_vector(2 downto 0);
         DR_SEL_WR_2         : in std_logic_vector(2 downto 0);
-        DR_SEL_RD_1         : in std_logic_vector(3 downto 0);
-        DR_SEL_RD_2         : in std_logic_vector(3 downto 0);
+        DR_SEL_RD_1         : in std_logic_vector(2 downto 0);
+        DR_SEL_RD_2         : in std_logic_vector(2 downto 0);
         DR_WR_1             : in bit;
         DR_WR_2             : in bit;
         DR_MARK_USED        : in bit;
@@ -66,16 +66,16 @@ entity WF68K30L_DATA_REGISTERS is
 end entity WF68K30L_DATA_REGISTERS;
     
 architecture BEHAVIOUR of WF68K30L_DATA_REGISTERS is
-    type DR_TYPE is array(0 to 7) of std_logic_vector(31 downto 0);
-    signal DR               : DR_TYPE; -- Data registers D0 to D7.
-    signal DR_PNTR_WR_1     : integer range 0 to 7;
-    signal DR_PNTR_WR_2     : integer range 0 to 7;
-    signal DR_PNTR_RD_1     : integer range 0 to 7;
-    signal DR_PNTR_RD_2     : integer range 0 to 7;
-    signal DR_SEL_WR_I1     : std_logic_vector(2 downto 0);
-    signal DR_SEL_WR_I2     : std_logic_vector(2 downto 0);
-    signal DR_USED_1        : std_logic_vector(3 downto 0);
-    signal DR_USED_2        : std_logic_vector(3 downto 0);
+type DR_TYPE is array(0 to 7) of std_logic_vector(31 downto 0);
+signal DR               : DR_TYPE; -- Data registers D0 to D7.
+signal DR_PNTR_WR_1     : integer range 0 to 7;
+signal DR_PNTR_WR_2     : integer range 0 to 7;
+signal DR_PNTR_RD_1     : integer range 0 to 7;
+signal DR_PNTR_RD_2     : integer range 0 to 7;
+signal DR_SEL_WR_I1     : std_logic_vector(2 downto 0);
+signal DR_SEL_WR_I2     : std_logic_vector(2 downto 0);
+signal DR_USED_1        : std_logic_vector(3 downto 0);
+signal DR_USED_2        : std_logic_vector(3 downto 0);
 begin
     INBUFFER: process
     begin
@@ -88,35 +88,27 @@ begin
 
     DR_PNTR_WR_1 <= conv_integer(DR_SEL_WR_I1);
     DR_PNTR_WR_2 <= conv_integer(DR_SEL_WR_I2);
-    DR_PNTR_RD_1 <= conv_integer(DR_SEL_RD_1(2 downto 0));
-    DR_PNTR_RD_2 <= conv_integer(DR_SEL_RD_2(2 downto 0));
+    DR_PNTR_RD_1 <= conv_integer(DR_SEL_RD_1);
+    DR_PNTR_RD_2 <= conv_integer(DR_SEL_RD_2);
 
     P_IN_USE: process
     begin
         wait until CLK = '1' and CLK' event;
-        if RESET = '1' then
-            DR_USED_1 <= x"0";
-            DR_USED_2 <= x"0";
+        if RESET = '1' or UNMARK = '1' then
+            DR_USED_1(3) <= '0';
+            DR_USED_2(3) <= '0';
         elsif DR_MARK_USED = '1' then
             DR_USED_1 <= '1' & DR_SEL_WR_1;
             if USE_DPAIR = true then
                 DR_USED_2 <= '1' & DR_SEL_WR_2;
             end if;
         end if;
-        --
-        if DR_WR_1 = '1' or UNMARK = '1' then
-            DR_USED_1(3) <= '0';
-        end if;
-        --
-        if DR_WR_2 = '1' or UNMARK = '1' then
-            DR_USED_2(3) <= '0';
-        end if;
     end process P_IN_USE;
 
-    DR_IN_USE <= '1' when DR_USED_1(3) = '1' and DR_USED_1 = DR_SEL_RD_1 else
-                 '1' when DR_USED_1(3) = '1' and DR_USED_1 = DR_SEL_RD_2 else
-                 '1' when DR_USED_2(3) = '1' and DR_USED_2 = DR_SEL_RD_1 else
-                 '1' when DR_USED_2(3) = '1' and DR_USED_2 = DR_SEL_RD_2 else '0';
+    DR_IN_USE <= '1' when DR_USED_1(3) = '1' and DR_USED_1(2 downto 0) = DR_SEL_RD_1 else
+                 '1' when DR_USED_1(3) = '1' and DR_USED_1(2 downto 0) = DR_SEL_RD_2 else
+                 '1' when DR_USED_2(3) = '1' and DR_USED_2(2 downto 0) = DR_SEL_RD_1 else
+                 '1' when DR_USED_2(3) = '1' and DR_USED_2(2 downto 0) = DR_SEL_RD_2 else '0';
 
     DR_OUT_1 <= DR(DR_PNTR_RD_1);
     DR_OUT_2 <= DR(DR_PNTR_RD_2);
