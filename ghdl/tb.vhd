@@ -38,8 +38,8 @@ architecture sim of tb is
     end function to32;
 
 
-    -- 400 bytes of 32 bit memory
-    signal memory               : memarray(0 to 100)(31 downto 0) :=
+    -- 4K of 32 bit memory
+    signal memory               : memarray(0 to 1024)(31 downto 0) :=
     (
         0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
@@ -82,8 +82,8 @@ architecture sim of tb is
 
     --
     -- Build a small array around memory the stack pointer points to.
-    -- This enables waveform viewers to display stack and memory around 
-    -- (-5 to +5 long words below and above where s points to) 
+    -- This enables waveform viewers to display stack and memory around
+    -- (-5 to +5 long words below and above where s points to)
     --
     procedure stack_viewer(signal s : in std_logic_vector(31 downto 0);
                            signal mem : in memarray;

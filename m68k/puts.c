@@ -1,4 +1,4 @@
-int putchar(unsigned int c)
+static inline int putchar(unsigned int c)
 {
     volatile unsigned long *term_ready = (volatile unsigned long *) 0xfffffff0;
     volatile unsigned long *term_out = (volatile unsigned long *) 0xfffffff4;
@@ -12,7 +12,7 @@ int putchar(unsigned int c)
 
 int puts(char *str)
 {
-    int c;
+    unsigned int c;
 
     while ((c = *str++))
         putchar(c);
