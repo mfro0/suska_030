@@ -14,7 +14,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright © 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
+---- Copyright ï¿½ 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -134,7 +134,8 @@ entity WF68K30L_ADDRESS_REGISTERS is
         PC_INC              : in bit; -- Program counter increment.
         PC_LOAD             : in bit; -- Program counter write.
         PC_RESTORE          : in bit;
-        PC_OFFSET           : in std_logic_vector(7 downto 0)
+        PC_OFFSET           : in std_logic_vector(7 downto 0);
+        sp                  : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_ADDRESS_REGISTERS;
     
@@ -159,6 +160,8 @@ signal PC_I             : std_logic_vector(31 downto 0); -- Active program count
 signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
 signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
 begin
+    sp <= std_ulogic_vector(ISP_REG);
+
     INBUFFER: process
     begin
         wait until CLK = '1' and CLK' event;

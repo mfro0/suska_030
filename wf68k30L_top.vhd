@@ -261,7 +261,8 @@ entity WF68K30L_TOP is
         -- Bus arbitration control:
         BRn             : in std_logic;
         BGn             : out std_logic;
-        BGACKn          : in std_logic
+        BGACKn          : in std_logic;
+        sp              : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_TOP;
     
@@ -906,7 +907,8 @@ begin
             PC_INC                  => PC_INC,
             PC_LOAD                 => PC_LOAD,
             PC_RESTORE              => PC_RESTORE_EXH,
-            PC_OFFSET               => PC_OFFSET
+            PC_OFFSET               => PC_OFFSET,
+            sp                      => sp
         );
 
     I_ALU: WF68K30L_ALU
