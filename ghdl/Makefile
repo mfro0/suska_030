@@ -37,6 +37,11 @@ tb: tb.o code
 .PHONY: run
 run: tb
 	./tb $(GHDL_RUNFLAGS) --wave=tb.ghw
+
+.PHONY: view
+view: tb.ghw
+	gtkwave tb.ghw tb.gtkw
+
 .PHONY: clean
 clean:
 	rm $(TG68_OBJS) tb

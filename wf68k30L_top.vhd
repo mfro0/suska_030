@@ -262,6 +262,8 @@ entity WF68K30L_TOP is
         BRn             : in std_logic;
         BGn             : out std_logic;
         BGACKn          : in std_logic;
+        
+        -- temporary, for debugging purposes
         sp              : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_TOP;

@@ -210,10 +210,10 @@ begin
             -- bus arbitration control
             BRn                 => br_n,
             BGn                 => bg_n,
-            BGACKn              => bgack_n
+            BGACKn              => bgack_n,
 
             -- debugging
-            --sp                  => sp
+            sp                  => sp
         );
 end architecture sim;
 
