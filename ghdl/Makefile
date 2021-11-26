@@ -36,7 +36,7 @@ tb: tb.o code
 
 .PHONY: run
 run: tb
-	./tb $(GHDL_RUNFLAGS) --wave=tb.ghw
+	./tb $(GHDL_RUNFLAGS) --wave=tb.ghw --max-stack-alloc=0
 
 .PHONY: view
 view: tb.ghw

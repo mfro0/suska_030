@@ -39,7 +39,7 @@ architecture sim of tb is
 
 
     -- 4K of 32 bit memory
-    signal memory               : memarray(0 to 1024)(31 downto 0) :=
+    signal memory               : memarray(0 to 10000)(31 downto 0) :=
     (
         0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
@@ -77,6 +77,7 @@ architecture sim of tb is
     signal ipend_n              : std_ulogic;
     signal size_n               : std_ulogic_vector(1 downto 0);
     signal sp                   : std_ulogic_vector(31 downto 0);
+    signal counter25            : std_ulogic_vector(31 downto 0) := (others => '0');
 
     signal stack                : stackdisplay := (others => (others => '0'));
 
@@ -106,7 +107,16 @@ begin
     halt_n <= '0', '1' after 520 * 40 ns;
 
     p_clkit : process(all)
+        variable presc : unsigned(31 downto 0) := (others => '0');
     begin
+        presc := presc + 1;
+        if presc = x"100" then
+            presc := (others => '0');
+            counter25 <= std_ulogic_vector(unsigned(counter25) + 1);
+        else
+            presc := presc + 1;
+        end if;
+
         clk_25 <= not clk_25 after 40 ns;  -- 25 MHz
     end process p_clkit;
 
@@ -144,6 +154,13 @@ begin
                             dsack_n <= (others => '0');
                             --report l.all severity note;
                         end if;
+                    end if;
+                elsif adr_out = x"fffffff8" then
+                    -- simple timer
+                    if rw_n = '1' then      -- read cycle
+                        -- return the current value of our 25 MHz counter
+                        data_in <= counter25;
+                        dsack_n <= (others => '0');
                     end if;
                 elsif unsigned(adr_out) / 4 >= to_unsigned(memory'low, 32) and
                       unsigned(adr_out) / 4 <= to_unsigned(memory'high, 32) then

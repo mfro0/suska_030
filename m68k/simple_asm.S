@@ -13,31 +13,16 @@ _start:         .long   initialstack
 
 initialpc:
                 lea     initialstack,sp
-<<<<<<< HEAD
-                pea.l   faraway
-                lea     3 * 4(sp),sp
-loop:           move.l  #hello_world,-(sp)
-*loop:           pea     hello_world.l
-                bsr     _puts
-                addq.l  #4,sp
-                bra.s   loop
-                nop
-=======
-                lea     3 * 4(sp),sp
+                move.l  #0xaffeaffe,(sp)
 *loop:           move.l  #hello_world,-(sp)
 loop:           pea     hello_world
                 bsr     _puts
                 addq.l  #4,sp
                 bra.s   loop
->>>>>>> a0e275c8e3d8bf9ecca9e9def86d1ca6c9795cf1
 
                 .data
 hello_world:
-<<<<<<< HEAD
-                .ascii  "Hello World"
-=======
                 .ascii  "A friendly hello World from the m68k!"
->>>>>>> a0e275c8e3d8bf9ecca9e9def86d1ca6c9795cf1
                 .byte   13,10,0
 
                 .bss
