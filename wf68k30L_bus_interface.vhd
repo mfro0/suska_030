@@ -31,7 +31,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright © 2014 Wolfgang Foerster Inventronik GmbH.           ----
+---- Copyright © 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -48,6 +48,19 @@
 -- 
 -- Revision 2K14B 20141201 WF
 --   Initial Release.
+-- Revision 2K18A 20180620 WF
+--   Suppress bus faults during RESET instruction.
+--   Optimized ASn and DSn timing for synchronous RAM.
+--   DATA_PORT_EN timing optimization.
+--   BUS_EN is now active except during arbitration.
+--   Rearanged the DATA_RDY vs. BUS_FLT logic.
+--   Opted out START_READ and CHK_RD.
+--   Fixed the faulty bus arbitration logic.
+--   Rearranged address error handling.
+-- Revision 2K20A 20200620 WF
+--   ASn and DSn are not asserted in S0 any more.
+--   Some modifications to optimize the RETRY logic.
+--   Fixed a bug in the DSACK_MEM logic (now switches explicitely to "00").
 -- 
 
 library work;
@@ -126,95 +139,100 @@ entity WF68K30L_BUS_INTERFACE is
         AVECn               : in std_logic; -- Auto interrupt vector input (top level entity).
         HALTn               : in std_logic; -- Halt (top level entity).
         BERRn               : in std_logic; -- Bus error (top level entity).
-        AERR                : out bit; -- Core internal address error.
-        BERR_WR             : out bit; -- Bus error during write operations.
+        AERR                : buffer bit; -- Core internal address error.
 
         BUS_BSY             : out bit -- Bus is busy when '1'.
     );
 end entity WF68K30L_BUS_INTERFACE;
     
 architecture BEHAVIOR of WF68K30L_BUS_INTERFACE is
-    type BUS_CTRL_STATES is (IDLE, START_CYCLE, DATA_C1C4);
-    type ARB_STATES is(IDLE, GRANT, WAIT_RELEASE_1or3WIRE);
-    type BUS_WIDTH_TYPE is(LONG_32, WORD, BYTE);
-    type TIME_SLICES is (IDLE, S0, S1, S2, S3, S4, S5);
-    signal ADR_10               : std_logic_vector(1 downto 0);
-    signal ADR_OFFSET           : std_logic_vector(5 downto 0);
-    signal ADR_OUT_I            : std_logic_vector(31 downto 0);
-    signal AERR_I               : bit;
-    signal ARB_STATE            : ARB_STATES := IDLE;
-    signal AVEC_In              : std_logic;
-    signal BGACK_In             : std_logic;
-    signal BR_In                : std_logic;
-    signal BUS_CTRL_STATE       : BUS_CTRL_STATES;
-    signal BUS_CYC_RDY          : bit;
-    signal BUS_FLT              : std_logic;
-    signal BUS_WIDTH            : BUS_WIDTH_TYPE;
-    signal CHK_RD               : bit;
-    signal DATA_INMUX           : std_logic_vector(31 downto 0);
-    signal DATA_RDY_I           : bit;
-    signal DBUFFER              : std_logic_vector(31 downto 0);
-    signal DSACK_In             : std_logic_vector(1 downto 0);
-    signal DSACK_MEM            : bit_vector(1 downto 0);
-    signal OCS_INH              : bit;
-    signal HALT_In              : bit;
-    signal HALTED               : bit;
-    signal NEXT_ARB_STATE       : ARB_STATES;
-    signal NEXT_BUS_CTRL_STATE  : BUS_CTRL_STATES;
-    signal OBUFFER              : std_logic_vector(15 downto 0);
-    signal OP_SIZE_I            : OP_SIZETYPE;
-    signal OPCODE_ACCESS        : bit;
-    signal OPCODE_RDY_I         : bit;
-    signal READ_ACCESS          : bit;
-    signal RESET_CPU_I          : bit;
-    signal RESET_OUT_I          : std_logic;
-    signal RETRY                : bit;
-    signal SIZE_D               : std_logic_vector(1 downto 0);
-    signal SIZE_I               : std_logic_vector(1 downto 0);
-    signal SIZE_N               : std_logic_vector(2 downto 0) := "000";
-    signal SLICE_CNT_N          : std_logic_vector(2 downto 0);
-    signal SLICE_CNT_P          : std_logic_vector(2 downto 0);
-    signal START_READ           : bit;
-    signal STERM_In             : std_logic;
-    signal T_SLICE              : TIME_SLICES;
-    signal WAITSTATES           : bit;
-    signal WP_BUFFER            : std_logic_vector(31 downto 0);
-    signal WRITE_ACCESS         : bit;
+type BUS_CTRL_STATES is (IDLE, START_CYCLE, DATA_C1C4);
+type ARB_STATES is(IDLE, GRANT, WAIT_RELEASE_3WIRE);
+type BUS_WIDTH_TYPE is(LONG_32, WORD, BYTE);
+type TIME_SLICES is (IDLE, S0, S1, S2, S3, S4, S5);
+signal ADR_10               : std_logic_vector(1 downto 0);
+signal ADR_OFFSET           : std_logic_vector(5 downto 0);
+signal ADR_OUT_I            : std_logic_vector(31 downto 0);
+signal AERR_I               : bit;
+signal ARB_STATE            : ARB_STATES := IDLE;
+signal AVEC_In              : std_logic;
+signal BGACK_In             : std_logic;
+signal BR_In                : std_logic;
+signal BUS_CTRL_STATE       : BUS_CTRL_STATES;
+signal BUS_CYC_RDY          : bit;
+signal BUS_FLT              : std_logic;
+signal BUS_WIDTH            : BUS_WIDTH_TYPE;
+signal DATA_INMUX           : std_logic_vector(31 downto 0);
+signal DATA_RDY_I           : bit;
+signal DBUFFER              : std_logic_vector(31 downto 0);
+signal DSACK_In             : std_logic_vector(1 downto 0);
+signal DSACK_MEM            : std_logic_vector(1 downto 0);
+signal OCS_INH              : bit;
+signal HALT_In              : std_logic;
+signal HALTED               : bit;
+signal NEXT_ARB_STATE       : ARB_STATES;
+signal NEXT_BUS_CTRL_STATE  : BUS_CTRL_STATES;
+signal OBUFFER              : std_logic_vector(15 downto 0);
+signal OPCODE_ACCESS        : bit;
+signal OPCODE_RDY_I         : bit;
+signal READ_ACCESS          : bit;
+signal RESET_CPU_I          : bit;
+signal RESET_OUT_I          : std_logic;
+signal RETRY                : bit;
+signal SIZE_D               : std_logic_vector(1 downto 0);
+signal SIZE_I               : std_logic_vector(1 downto 0);
+signal SIZE_N               : std_logic_vector(2 downto 0) := "000";
+signal SLICE_CNT_N          : std_logic_vector(2 downto 0);
+signal SLICE_CNT_P          : std_logic_vector(2 downto 0);
+signal STERM_Dn             : std_logic;
+signal T_SLICE              : TIME_SLICES;
+signal WAITSTATES           : bit;
+signal WP_BUFFER            : std_logic_vector(31 downto 0);
+signal WRITE_ACCESS         : bit;
 begin
-
-    START_READ <= '0' when SIZE_N /= "000" else -- Pending cycles.
-                  '1' when BUS_CTRL_STATE = START_CYCLE and CHK_RD = '1' else '0';
-
     P_SYNC: process(CLK)
-    -- These flip flops synchronize the bus termination signal on the negative clock edge. 
-    -- This meets the requirement of sampling these signals in the end of S2 for asynchronous 
-    -- bus access. Be aware, that we have to buffer the RETRY signal to prevent the bus 
-    -- controller of spurious or timing critical BERRn and/or HALTn signals.
-    -- Note: there is no need to synchronize the already synchronous bus control signals 
-    -- STERMn. But the logic needs delayed signals.
-    -- Remark: launching BUS_FLT on the positive clock edge significantly enhances the 
-    -- system performance concerning the maximum clock frequency.
-    variable BUS_FLT_VAR    : std_logic;
+    -- These flip flops synchronize external signals on the negative clock edge. This
+    -- meets the requirement of sampling these signals in the end of S2 for asynchronous
+    -- bus access. Be aware, that we have to buffer the RETRY signal to prevent the bus
+    -- controller of spurious or timing critical BERRn and/or HALTn signals. The logic
+    -- for BUS_FLT and RETRY is coded in a way that we have a bus error or a retry
+    -- condition but not both at the same time.    
+    -- Note: there is no need to synchronize the already synchronous bus control signals
+    variable BERR_VARn      : std_logic;
+    variable HALT_VARn      : std_logic;
     begin
         if CLK = '0' and CLK' event then
             DSACK_In <= DSACKn;
-            HALT_In <= To_Bit(HALTn);
-            BUS_FLT_VAR := not BERRn;
-            STERM_In <= STERMn; -- Delayed.
             BR_In <= BRn;
             BGACK_In <= BGACKn;
             AVEC_In <= AVECn;
-            --
-            if BERRn = '0' and HALTn = '0' and BUS_CTRL_STATE = DATA_C1C4 and SIZE_N /= "000" then
-                RETRY <= '1';
-            elsif T_SLICE = IDLE and (BERRn = '1' or HALTn = '1') then
-                RETRY <= '0';
-            end if;
+            HALT_VARn := HALTn;
+            BERR_VARn := BERRn;
         end if;
         --
         if CLK = '1' and CLK' event then
-            BUS_FLT <= BUS_FLT_VAR;
-            AERR <= AERR_I;
+            if BUS_CTRL_STATE = START_CYCLE then
+                AERR <= AERR_I; -- AERR_I is valid in this state.
+            else
+                AERR <= '0';
+            end if;
+            --
+            HALT_In <= HALTn or HALT_VARn;
+            --
+            if BUS_CTRL_STATE = DATA_C1C4 then
+                if (BERRn nand BERR_VARn) = '1' and (HALTn or HALT_VARn) = '0' and SIZE_N /= "000" then
+                    RETRY <= '1';
+                elsif T_SLICE = IDLE and (BERRn = '1' and HALTn = '1' and BERR_VARn = '1' and HALT_VARn = '1') then
+                    RETRY <= '0';
+                elsif RETRY = '0' then
+					BUS_FLT <= (BERRn nor BERR_VARn) and HALT_VARn and HALTn;
+                end if;
+            else
+                BUS_FLT <= '0';
+                RETRY <= '0';
+            end if;
+            --
+            STERM_Dn <= STERMn; -- Delay to update the SIZE_N and SIZE_M before BUS_CYC_RDY is asserted.
         end if;
     end process P_SYNC;
 
@@ -228,28 +246,23 @@ begin
         if BUS_CTRL_STATE = START_CYCLE then
             if READ_ACCESS = '1' or WRITE_ACCESS = '1' or OPCODE_ACCESS = '1' then
                 null; -- Do not start either new cycle.
-            elsif START_READ = '1' then
+            elsif RD_REQ = '1' then
                 READ_ACCESS <= '1';
             elsif WR_REQ = '1' then
                 WRITE_ACCESS <= '1';
             elsif OPCODE_REQ = '1' then
                 OPCODE_ACCESS <= '1';
             end if;
+        elsif AERR = '1' then -- Reject due to address error.
+            READ_ACCESS <= '0';
+            WRITE_ACCESS <= '0';
+            OPCODE_ACCESS <= '0';
         elsif BUS_CTRL_STATE = DATA_C1C4 and NEXT_BUS_CTRL_STATE = IDLE and SIZE_N = "000" then
             READ_ACCESS <= '0';
             WRITE_ACCESS <= '0';
             OPCODE_ACCESS <= '0';
         end if;
     end process ACCESSTYPE;
-
-    SIZE_LATCH: process
-    -- This register stores the size information during a running bus cycle.
-    begin
-        wait until CLK = '1' and CLK' event;
-        if BUS_CTRL_STATE = IDLE and READ_ACCESS = '0' and  WRITE_ACCESS = '0' and  OPCODE_ACCESS = '0' then
-            OP_SIZE_I <= OP_SIZE;
-        end if;
-    end process SIZE_LATCH;
 
     P_DF: process
     -- This is the logic which provides the fault flags for data cycles and
@@ -258,7 +271,7 @@ begin
     begin
         wait until CLK = '1' and CLK' event;
         if BUSY_EXH = '0' then -- Do not alter during exception processing.
-            case OP_SIZE_I is
+            case OP_SIZE is
                 when LONG => SIZEVAR := "10";
                 when WORD => SIZEVAR := "01";
                 when BYTE => SIZEVAR := "00";
@@ -289,12 +302,10 @@ begin
     -- during the current bus access.
     begin
         wait until CLK = '1' and CLK' event;
-        if DSACK_In = "01" then
-            DSACK_MEM <= "01";
-        elsif DSACK_In = "10" then
-            DSACK_MEM <= "10";
-        elsif BUS_CTRL_STATE = IDLE then
+        if BUS_CTRL_STATE = IDLE then
             DSACK_MEM <= "11";
+        elsif DSACK_In /= "11" then
+            DSACK_MEM <= DSACK_In;
         end if;
     end process P_BUSWIDTH;
     
@@ -314,15 +325,13 @@ begin
 
         if BUS_CTRL_STATE = DATA_C1C4 and T_SLICE = S1 then -- On positive clock edge.
             RESTORE_VAR := SIZE_N; -- We need this initial value for early RETRY.
-        elsif BUS_CTRL_STATE = DATA_C1C4 and ((T_SLICE = S1 and STERMn = '0') or (T_SLICE = S3 and WAITSTATES = '0')) then
-            RESTORE_VAR := SIZE_N; -- This is for late RETRY.
         end if;
         --
         if RESET_CPU_I = '1' then
             SIZE_N <= "000";
         elsif BUS_CTRL_STATE /= DATA_C1C4 and NEXT_BUS_CTRL_STATE = DATA_C1C4 then
-            if START_READ = '1' or WR_REQ = '1' then
-                case OP_SIZE_I is
+            if RD_REQ = '1' or WR_REQ = '1' then
+                case OP_SIZE is
                     when LONG => SIZE_N <= "100";
                     when WORD => SIZE_N <= "010";
                     when BYTE => SIZE_N <= "001";
@@ -362,7 +371,6 @@ begin
         --
         if (BUS_FLT = '1' and HALT_In = '1') then -- Abort bus cycle.
             SIZE_N <= "000";
-            RESTORE_VAR := "000";
         end if;        
     end process PARTITIONING;
 
@@ -385,9 +393,8 @@ begin
         BUS_CTRL_STATE <= NEXT_BUS_CTRL_STATE;
     end process BUS_STATE_REG;
 
-    BUS_CTRL_DEC: process(ADR_IN_P, ADR_OUT_I, BUS_CTRL_STATE, BUS_CYC_RDY, BUS_FLT,  
-                          HALT_In, OPCODE_ACCESS, OPCODE_REQ, RD_REQ, 
-                          READ_ACCESS, RESET_CPU_I, SIZE_N, START_READ, WR_REQ, WRITE_ACCESS)
+    BUS_CTRL_DEC: process(ADR_IN_P, ADR_OUT_I, ARB_STATE, BGACK_In, BR_In, BUS_CTRL_STATE, BUS_CYC_RDY, BUS_FLT, HALT_In, 
+                          OPCODE_ACCESS, OPCODE_REQ, RD_REQ, READ_ACCESS, RESET_CPU_I, RMC, SIZE_N, WR_REQ, WRITE_ACCESS)
     -- This is the bus controller's state machine decoder.  A SIZE_N count of "000" means that all bytes
     -- to be transfered. After a bus transfer a value of x"0" indicates that no further bytes are required
     -- for a bus transfer.
@@ -396,8 +403,10 @@ begin
             when IDLE =>
                 if RESET_CPU_I = '1' then
                     NEXT_BUS_CTRL_STATE <= IDLE;  -- Reset condition (bus cycle terminated).
-                elsif BUS_FLT = '0' and HALT_In = '0' then
+                elsif HALT_In = '0' then
                     NEXT_BUS_CTRL_STATE <= IDLE;  -- This is the 'HALT' condition.
+                elsif (BR_In = '0' and RMC = '0') or ARB_STATE /= IDLE or BGACK_In = '0' then
+                    NEXT_BUS_CTRL_STATE <= IDLE;  -- Arbitration, wait!
                 elsif RD_REQ = '1' and SIZE_N = "000" then
                     NEXT_BUS_CTRL_STATE <= START_CYCLE; -- New read cycle.
                 elsif WR_REQ = '1' and SIZE_N = "000" then
@@ -410,11 +419,13 @@ begin
                     NEXT_BUS_CTRL_STATE <= IDLE;
                 end if;
             when START_CYCLE =>
-                if START_READ = '1' then
+                if RD_REQ = '1' then
                     NEXT_BUS_CTRL_STATE <= DATA_C1C4;
                 elsif WR_REQ = '1' then
                     NEXT_BUS_CTRL_STATE <= DATA_C1C4;
-                elsif OPCODE_REQ = '1' and ADR_IN_P(0) = '1' and RD_REQ = '0' and WR_REQ = '0' then
+                elsif OPCODE_REQ = '1' and ADR_IN_P(0) = '1' then
+                    NEXT_BUS_CTRL_STATE <= IDLE; -- Abort due to address error.
+                elsif OPCODE_REQ = '1' and ADR_IN_P(0) = '1' then
                     NEXT_BUS_CTRL_STATE <= IDLE; -- Abort due to address error.
                 elsif OPCODE_REQ = '1' then
                     NEXT_BUS_CTRL_STATE <= DATA_C1C4;
@@ -431,9 +442,9 @@ begin
     end process BUS_CTRL_DEC;
 
     P_ADR_OFFS: process
-        -- This process provides a temporary address offset during
-        -- bus access over up to 16 bytes in case of burst filling.
-        variable OFFSET_VAR     : std_logic_vector(2 downto 0) := "000";
+    -- This process provides a temporary address offset during
+    -- bus access.
+    variable OFFSET_VAR     : std_logic_vector(2 downto 0) := "000";
     begin
         wait until CLK = '1' and CLK' event;
         if RESET_CPU_I = '1' then
@@ -479,8 +490,7 @@ begin
     end process P_ADR_10;
 
     -- Address and bus errors:
-    AERR_I <= '1' when BUS_CTRL_STATE = START_CYCLE and OPCODE_REQ = '1' and START_READ = '0' and WR_REQ = '0' and ADR_IN_P(0) = '1' else '0';
-    BERR_WR <= '1' when WRITE_ACCESS = '1' and BUS_FLT = '1' else '0'; 
+    AERR_I <= '1' when BUS_CTRL_STATE = START_CYCLE and OPCODE_REQ = '1' and RD_REQ = '0' and WR_REQ = '0' and ADR_IN_P(0) = '1' else '0';
 
     FC_OUT <= FC_IN;
 
@@ -510,7 +520,7 @@ begin
         WP_BUFFER(31 downto 16) & WP_BUFFER(31 downto 16) when SIZE_I = "00" and ADR_OUT_I(1 downto 0) = "10" else
         WP_BUFFER(31 downto 24) & WP_BUFFER(31 downto 16) & WP_BUFFER(31 downto 24) when SIZE_I = "00" and ADR_OUT_I(1 downto 0) = "11" else
         -- 3 bytes:
-        WP_BUFFER(23 downto 0) & WP_BUFFER(23 downto 16) when SIZE_I = "11" and ADR_OUT_I(1 downto 0) = "00" else
+        WP_BUFFER(23 downto 0) & WP_BUFFER(31 downto 24) when SIZE_I = x"3" and ADR_OUT_I(1 downto 0) = "00" else
         WP_BUFFER(23 downto 16) & WP_BUFFER(23 downto 0) when SIZE_I = "11" and ADR_OUT_I(1 downto 0) = "01" else
         WP_BUFFER(23 downto 8) & WP_BUFFER(23 downto 8) when SIZE_I = "11" and ADR_OUT_I(1 downto 0) = "10" else
         WP_BUFFER(23 downto 16) & WP_BUFFER(23 downto 8) & WP_BUFFER(23 downto 16) when SIZE_I = "11" and ADR_OUT_I(1 downto 0) = "11" else
@@ -601,8 +611,8 @@ begin
     end process IN_MUX;
 
     VALIDATION: process
-        -- These flip flops detect a fault during the read operation over one or
-        -- several bytes or during the write operation.
+    -- These flip flops detect a fault during the read operation over one or
+    -- several bytes or during the write operation.
     begin
         wait until CLK = '1' and CLK' event;
         --
@@ -616,9 +626,7 @@ begin
         --
         if RESET_CPU_I = '1' then
             DATA_VALID <= '1';
-        elsif READ_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_FLT = '1' and HALT_In = '0' then
-            null; -- This is the RETRY condition, no bus error.
-        elsif READ_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_FLT = '1' then
+        elsif BUS_CTRL_STATE = DATA_C1C4 and BUS_FLT = '1' then
             DATA_VALID <= '0';
         elsif DATA_RDY_I = '1' then
             DATA_VALID <= '1'; -- Reset after use, TRAP_BERR is asserted during DATA_RDY.
@@ -626,12 +634,12 @@ begin
     end process VALIDATION;
 
     PREFETCH_BUFFERS: process
-        -- These are the data and the operation code input registers. After a last read to the registered
-        -- input multiplexer, the respective data is copied from the input multiplexer to these buffers.
-        -- The opcode buffer is always written with 32 bit data. The data buffers may contain invalid bytes
-        -- in case of word or byte data size.
-        variable DBUFFER_MEM    : std_logic_vector(31 downto 8) := x"000000";
-        variable RDY_VAR        : bit := '0';
+    -- These are the data and the operation code input registers. After a last read to the registered
+    -- input multiplexer, the respective data is copied from the input multiplexer to these buffers.
+    -- The opcode buffer is always written with 32 bit data. The data buffers may contain invalid bytes
+    -- in case of word or byte data size.
+    variable DBUFFER_MEM    : std_logic_vector(31 downto 8) := x"000000";
+    variable RDY_VAR        : bit := '0';
     begin
         wait until CLK = '1' and CLK' event;
         --
@@ -646,7 +654,9 @@ begin
             RDY_VAR := '1';
         end if;
         -- Opcode cycle:
-        if OPCODE_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_CYC_RDY = '1' and SIZE_N = "000" then
+        if AERR_I = '1' then
+            OPCODE_RDY_I <= '1';
+        elsif OPCODE_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_CYC_RDY = '1' and SIZE_N = "000" then
             -- Instruction prefetches are always long and on word boundaries.
             -- The word is available after the first word read.
             OBUFFER <= DATA_INMUX(15 downto 0);
@@ -656,7 +666,7 @@ begin
         if WRITE_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_CYC_RDY = '1' and SIZE_N = "000" then
             DATA_RDY_I <= RDY_VAR;
         elsif READ_ACCESS = '1' and BUS_CTRL_STATE = DATA_C1C4 and BUS_CYC_RDY = '1' then
-            case OP_SIZE_I is
+            case OP_SIZE is
                 when LONG =>
                     if SIZE_N = "000" then
                         DBUFFER <= DATA_INMUX;
@@ -674,26 +684,16 @@ begin
         end if;
     end process PREFETCH_BUFFERS;
 
-    REQUESTS: process
-    -- This logic prevents the bus controller to start a read cycle in case the
-    -- Read request is asserted late in the START_OP phase.
-    begin
-        wait until CLK = '1' and CLK' event;
-        if BUS_CTRL_STATE = IDLE then
-            CHK_RD <= RD_REQ;
-        end if;
-    end process REQUESTS;
-
     DATA_RDY <= DATA_RDY_I;
-
     OPCODE_RDY <= OPCODE_RDY_I;
 
     DATA_TO_CORE <= DBUFFER;
     OPCODE_TO_CORE <= OBUFFER;
 
     WAITSTATES <= '0' when T_SLICE /= S3 else
+                  '1' when RESET_OUT_I = '1' else -- No bus fault during RESET instruction.
                   '0' when DSACK_In /= "11" else -- For asynchronous bus cycles.
-                  '0' when STERM_In = '0' else -- For synchronous bus cycles.
+                  '0' when STERMn = '0' else -- For synchronous bus cycles.
                   '0' when ADR_IN_P(19 downto 16) = x"F" and AVEC_In = '0' else -- Interrupt acknowledge space cycle.
                   '0' when BUS_FLT = '1' else -- In case of a bus error;
                   '0' when RESET_CPU_I = '1' else '1'; -- A CPU reset terminates the current bus cycle.
@@ -711,8 +711,8 @@ begin
                 SLICE_CNT_P <= "111"; -- Stay in IDLE, go to IDLE.
             elsif BUS_CTRL_STATE /= IDLE and NEXT_BUS_CTRL_STATE = IDLE then
                 SLICE_CNT_P <= "111"; -- Init.
-            elsif SLICE_CNT_P = "001" and STERM_In = '0' then -- Synchronous cycle.
-                SLICE_CNT_P <= "111"; -- Ready.
+            elsif SLICE_CNT_P = "001" and STERMn = '0' then -- Synchronous cycle.
+                SLICE_CNT_P <= "110"; -- Ready.
             elsif SLICE_CNT_P = "010" then
                 if RETRY = '1' then
                     SLICE_CNT_P <= "111"; -- Go IDLE.
@@ -721,8 +721,6 @@ begin
                 else
                     SLICE_CNT_P <= "000"; -- Go on.
                 end if;
-            elsif SLICE_CNT_P = "111" and BR_In = '0' then
-                null; -- Stay in idle while bus arbitration.
             elsif WAITSTATES = '0' then
                 SLICE_CNT_P <= SLICE_CNT_P + '1'; -- Cycle active.
             end if;
@@ -739,6 +737,7 @@ begin
                 S3 when SLICE_CNT_P = "001" and SLICE_CNT_N = "001" else
                 S4 when SLICE_CNT_P = "010" and SLICE_CNT_N = "001" else
                 S5 when SLICE_CNT_P = "010" and SLICE_CNT_N = "010" else
+                S3 when SLICE_CNT_P = "110" else -- This is a waitstate cycle for synchronous bus cycles to update SIZE_N before latching data. 
                 S0 when SLICE_CNT_P = "000" and SLICE_CNT_N = "010" else IDLE; -- Rollover from state S5 to S0.
 
     P_OCS: process
@@ -768,12 +767,12 @@ begin
              '0' when T_SLICE = S2 or T_SLICE = S3 or T_SLICE = S4 else '1'; -- Read.
 
     -- Bus tri state controls:
-    BUS_EN <= '0' when T_SLICE = IDLE else '1';
-    DATA_PORT_EN <= '1' when (T_SLICE = S2 or T_SLICE = S3) and WRITE_ACCESS = '1' else '0';
+    BUS_EN <= '1' when ARB_STATE = IDLE and RESET_CPU_I = '0' else '0';
+    DATA_PORT_EN <= '1' when WRITE_ACCESS = '1' and ARB_STATE = IDLE and RESET_CPU_I = '0' else '0';
 
     -- Progress controls:
     BUS_CYC_RDY <=  '0' when RETRY = '1' else
-                    '1' when T_SLICE = S3 and STERM_In = '0' else -- Synchronous cycles.
+                    '1' when STERM_Dn = '0' else -- Synchronous cycles.  STERMn delayed to update the SIZE_N and SIZE_M before BUS_CYC_RDY is asserted.
                     '1' when T_SLICE = S5 else '0'; -- Asynchronous cycles.
 
     -- Bus arbitration:
@@ -789,7 +788,7 @@ begin
         end if;
     end process ARB_REG;
     
-    ARB_DEC: process(ARB_STATE, BGACK_In, BR_In, RETRY, RMC, T_SLICE)
+    ARB_DEC: process(ARB_STATE, BGACK_In, BR_In, BUS_CTRL_STATE, RETRY, RMC)
     -- This is the bus arbitration state machine's decoder. It can handle single-, two- 
     -- or three wire arbitration. The two wire arbitration is done in the GRANT state
     -- by negating BRn.
@@ -798,28 +797,28 @@ begin
             when IDLE =>
                 if RMC = '1' and RETRY = '0' then
                     NEXT_ARB_STATE <= IDLE; -- Arbitration in RETRY operation is possible.
-                elsif BGACK_In = '0' and T_SLICE = IDLE then -- This is the single wire arbitration.
-                    NEXT_ARB_STATE <= WAIT_RELEASE_1or3WIRE;
-                elsif BR_In = '0' and T_SLICE = IDLE then -- Wait until the bus is free.
+                elsif BGACK_In = '0' and BUS_CTRL_STATE = IDLE then -- This is the single wire arbitration.
+                    NEXT_ARB_STATE <= WAIT_RELEASE_3WIRE;
+                elsif BR_In = '0' and BUS_CTRL_STATE = IDLE then -- Wait until the bus is free.
                     NEXT_ARB_STATE <= GRANT;
                 else
                     NEXT_ARB_STATE <= IDLE;
                 end if;
             when GRANT =>
                 if BGACK_In = '0' then
-                    NEXT_ARB_STATE <= WAIT_RELEASE_1or3WIRE;
+                    NEXT_ARB_STATE <= WAIT_RELEASE_3WIRE;
                 elsif BR_In = '1' then
                     NEXT_ARB_STATE <= IDLE; -- Resume normal operation.
                 else
                     NEXT_ARB_STATE <= GRANT;
                 end if;
-            when WAIT_RELEASE_1or3WIRE =>
+            when WAIT_RELEASE_3WIRE =>
                 if BGACK_In = '1' and BR_In = '0' then
                     NEXT_ARB_STATE <= GRANT; -- Re-enter new arbitration.
                 elsif BGACK_In = '1' then
                     NEXT_ARB_STATE <= IDLE;
                 else
-                    NEXT_ARB_STATE <= WAIT_RELEASE_1or3WIRE;
+                    NEXT_ARB_STATE <= WAIT_RELEASE_3WIRE;
                 end if;
         end case;
     end process ARB_DEC;

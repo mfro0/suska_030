@@ -36,7 +36,6 @@
 # -------------------------------------------------------------------------- #
 
 
-set_global_assignment -name FAMILY "Cyclone III"
 set_global_assignment -name DEVICE EP3C40F484C6
 set_global_assignment -name FAMILY "Cyclone III"
 set_global_assignment -name TOP_LEVEL_ENTITY wf68k30L_top

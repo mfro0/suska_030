@@ -32,11 +32,16 @@ tb: tb.o code
 	$(GHDL) -m $(GHDLFLAGS) $@
 
 %.o: %.vhd
-	$(GHDL) -a $(GHDLFLAGS) $<
+	$(GHDL) -i $(GHDLFLAGS) $<
 
 .PHONY: run
 run: tb
 	./tb $(GHDL_RUNFLAGS) --wave=tb.ghw
+
+.PHONY: view
+view: tb.ghw
+	gtkwave tb.ghw tb.gtkw
+
 .PHONY: clean
 clean:
 	rm $(TG68_OBJS) tb
