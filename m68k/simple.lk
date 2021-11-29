@@ -1,7 +1,7 @@
 SECTIONS
 {
         . = 0x00000000;
-        .text : { * (.text); }
-        .data : { * (.data); }
-        .bss  : { * (.bss); }
+        .text : SUBALIGN(8) { * (.text); }
+        .data : SUBALIGN(8) { * (.data); }
+        .bss  : SUBALIGN(8) { * (.bss); }
 }

@@ -38,8 +38,8 @@ architecture sim of tb is
     end function to32;
 
 
-    -- 4K of 32 bit memory
-    signal memory               : memarray(0 to 10000)(31 downto 0) :=
+    -- 40K of 32 bit memory
+    signal memory               : memarray(0 to 20480)(31 downto 0) :=
     (
         0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
@@ -94,7 +94,7 @@ architecture sim of tb is
             for i in sd'low to sd'high loop
                 -- do a sanity check to avoid bailout when stackpointer is
                 -- uninitialised during core startup
-                if unsigned(sp) / 4 > 32d"5" and unsigned(sp) / 4 < 32d"100"  then
+                if unsigned(sp) / 4 > 32d"5" and unsigned(sp) / 4 < 32d"20480"  then
                     sd(i) <= mem(to_integer(unsigned(s)) / 4 + i);
                 end if;
             end loop;
@@ -105,6 +105,14 @@ begin
 
     reset_n <= '0', '1' after 520 * 40 ns;
     halt_n <= '0', '1' after 520 * 40 ns;
+
+    p_crash : process(all)
+    begin
+        if berr_n = '0' then
+            report "Bus error accessing " & to_hstring(adr_out) & ". Halt and catch fire!" severity error;
+            std.env.stop(0);
+        end if;
+    end process p_crash;
 
     p_clkit : process(all)
         variable presc : unsigned(31 downto 0) := (others => '0');
@@ -145,7 +153,7 @@ begin
                     if rw_n = '0' then                      -- write cycle
                         if dben_n = '0' then
                             cs(1) := character'val(to_integer(unsigned(data_out(7 downto 0))));
-                            if cs(1) = LF then
+                            if cs(1) = CR then
                                 -- we only pass the CR through
                                 writeline(OUTPUT, l);
                             else
@@ -174,6 +182,8 @@ begin
                         memory(adr) <= data_out;
                     end if;
                     dsack_n <= (others => '0');           -- indicate 32 bit port size
+                elsif reset_n = '1' and dben_n = '0' then
+                    berr_n <= '0';
                 end if;
             end if;
         --end if;

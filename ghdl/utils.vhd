@@ -15,7 +15,7 @@ package utils is
     type memarray is array(integer range <>) of std_ulogic_vector;
     procedure hdump(mem : memarray);
 
-    type stackdisplay is array(-5 to 5) of std_ulogic_vector(31 downto 0);
+    type stackdisplay is array(-3 to 3) of std_ulogic_vector(31 downto 0);
 
 end package utils;
 

@@ -1,17 +1,6 @@
-
-*
-* simple m68k startup routine
-* 
-* code is supposed to start at address 0
-*
-
-                .org    0
-
                 .text
-_start:         .long   initialstack
-                .long   initialpc
-
-initialpc:
+		.globl	_main
+_main:
                 lea     initialstack,sp
                 move.l  #0xaffeaffe,(sp)
 *loop:           move.l  #hello_world,-(sp)
