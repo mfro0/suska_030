@@ -26,4 +26,4 @@ clean:
 	- rm -f $(OBJS) simple.out simple.bin mapfile tst.srec 
     
 dump:
-	$(OBJDUMP) -bbinary --architecture=m68k:68030 -D simple.bin
+	$(OBJDUMP) -bbinary --architecture=m68k:68030 -s -D simple.bin
