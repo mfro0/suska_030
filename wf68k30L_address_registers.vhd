@@ -14,7 +14,7 @@
 ----                                                                ----
 ------------------------------------------------------------------------
 ----                                                                ----
----- Copyright ï¿½ 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
+---- Copyright © 2014-2019 Wolfgang Foerster Inventronik GmbH.      ----
 ----                                                                ----
 ---- This documentation describes Open Hardware and is licensed     ----
 ---- under the CERN OHL v. 1.2. You may redistribute and modify     ----
@@ -135,6 +135,7 @@ entity WF68K30L_ADDRESS_REGISTERS is
         PC_LOAD             : in bit; -- Program counter write.
         PC_RESTORE          : in bit;
         PC_OFFSET           : in std_logic_vector(7 downto 0);
+
         sp                  : out std_ulogic_vector(31 downto 0)
     );
 end entity WF68K30L_ADDRESS_REGISTERS;
@@ -160,7 +161,7 @@ signal PC_I             : std_logic_vector(31 downto 0); -- Active program count
 signal SFC_REG          : std_logic_vector(2 downto 0); -- Special function code registers.
 signal USP_REG          : std_logic_vector(31 downto 0); -- User stack pointer (refers to A7 in the user mode.).
 begin
-    sp <= std_ulogic_vector(ISP_REG);
+    sp <= ISP_REG;
 
     INBUFFER: process
     begin
@@ -225,19 +226,19 @@ begin
     variable ADR_EFF_VAR        : std_logic_vector(31 downto 0);
     variable ADR_EFF_TMP        : std_logic_vector(31 downto 0);
     variable ADR_MUX            : std_logic_vector(31 downto 0);
-    variable B_S              : std_logic := '0'; -- Base register suppress.
+    variable B_S                : std_logic := '0'; -- Base register suppress.
     variable BASE_DISPL         : std_logic_vector(31 downto 0);
-    variable BD_SIZE          : std_logic_vector(1 downto 0); -- Indexed / Indirect.
-    variable F_E              : std_logic; -- Full extension word.
-    variable I_IS             : std_logic_vector(2 downto 0); -- Indexed / Indirect.
-    variable I_S              : std_logic; -- Index suppress.
+    variable BD_SIZE            : std_logic_vector(1 downto 0); -- Indexed / Indirect.
+    variable F_E                : std_logic; -- Full extension word.
+    variable I_IS               : std_logic_vector(2 downto 0); -- Indexed / Indirect.
+    variable I_S                : std_logic; -- Index suppress.
     variable I_S_IS             : std_logic_vector(3 downto 0);
     variable INDEX              : std_logic_vector(31 downto 0) := x"00000000";
     variable INDEX_SCALED       : std_logic_vector(31 downto 0);
     variable MEM_ADR            : std_logic_vector(31 downto 0);
     variable OUTER_DISPL        : std_logic_vector(31 downto 0);
     variable PCVAR              : std_logic_vector(31 downto 0);
-    variable SCALE            : std_logic_vector(1 downto 0); -- Scale information for the index.
+    variable SCALE              : std_logic_vector(1 downto 0); -- Scale information for the index.
     begin
         if CLK = '1' and CLK' event then
             if STORE_ADR_FORMAT = '1' then
@@ -365,12 +366,16 @@ begin
         I_S_IS := I_S & I_IS;
         PCVAR := PC_I + PC_EW_OFFSET; -- This is the address of the extension word.
 
-        if ADR_MODE = "110" and F_E = '1' and B_S = '1' then
-            ADR_MUX := x"00000000"; -- Base register suppress.
-        elsif ADR_MODE = "111" and AMODE_SEL = "011" and F_E = '1' and B_S = '1' then
-            ADR_MUX := x"00000000"; -- Base register suppress.
+--        if ADR_MODE = "110" and FETCH_MEM_ADR = '1' and F_E = '1' and B_S = '1' then
+--            ADR_MUX := x"00000000"; -- Base register suppress.
+--        elsif ADR_MODE = "111" and FETCH_MEM_ADR = '1' and AMODE_SEL = "011" and F_E = '1' and B_S = '1' then
+--            ADR_MUX := x"00000000"; -- Base register suppress.
+if ADR_MODE = "110" and F_E = '1' and B_S = '1' then
+    ADR_MUX := x"00000000"; -- Base register suppress.
+elsif ADR_MODE = "111" and AMODE_SEL = "011" and F_E = '1' and B_S = '1' then
+    ADR_MUX := x"00000000"; -- Base register suppress.
         elsif USE_DREG = '1' then
-            ADR_MUX := AR_IN_1;
+            ADR_MUX := AR_IN_1; -- Use data instead of address register.
         else
             case AR_PNTR_1 is
                 when 7 =>
@@ -396,8 +401,12 @@ begin
                     ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (d8, An, Xn, SIZE*SCALE).
                 else -- Full extension word.
                     case I_S_IS is
-                        when "0000" | "1000" => -- No memory indirect action.
-                            ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (bd, An, Xn, SIZE*SCALE).
+--                        when "0000" | "1000" => -- No memory indirect action.
+--                            ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (bd, An, Xn, SIZE*SCALE).
+when "0000" => -- No memory indirect action.
+    ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED; -- (bd, An, Xn, SIZE*SCALE).
+when "1000" => -- No memory indirect action with index suppression.
+    ADR_EFF_VAR := ADR_MUX + BASE_DISPL; -- (bd, An, Xn, SIZE*SCALE).
                         when "0001" | "0010" | "0011" => -- Memory indirect preindexed.
                             if FETCH_MEM_ADR = '1' then
                                 ADR_EFF_VAR := ADR_MUX + BASE_DISPL + INDEX_SCALED;
@@ -410,7 +419,8 @@ begin
                             else
                                 ADR_EFF_VAR := MEM_ADR + INDEX_SCALED + OUTER_DISPL;
                             end if;
-                        when "1001" | "1010" | "1011" => -- Memory indirect.
+--                        when "1001" | "1010" | "1011" => -- Memory indirect.
+when "1001" | "1010" | "1011" => -- Memory indirect, no index.
                             if FETCH_MEM_ADR = '1' then
                                 ADR_EFF_VAR := ADR_MUX + BASE_DISPL;
                             else
@@ -432,23 +442,42 @@ begin
                             ADR_EFF_VAR := PCVAR + BASE_DISPL + INDEX_SCALED; -- (d8, PC, Xn, SIZE*SCALE).
                         else -- Full extension word.
                             case I_S_IS is
-                                when "0000" | "1000" => -- No memory indirect action.
-                                    ADR_EFF_VAR := PCVAR + BASE_DISPL + INDEX_SCALED; -- (bd, PC, Xn, SIZE*SCALE).
+--                                when "0000" | "1000" => -- No memory indirect action.
+--                                    ADR_EFF_VAR := PCVAR + BASE_DISPL + INDEX_SCALED; -- (bd, PC, Xn, SIZE*SCALE).
+when "0000" => -- No memory indirect action.
+    ADR_EFF_VAR := PCVAR + BASE_DISPL + INDEX_SCALED; -- (bd, PC, Xn, SIZE*SCALE).
+when "1000" => -- No memory indirect action with index suppression.
+    ADR_EFF_VAR := PCVAR + BASE_DISPL; -- (bd, PC, Xn, SIZE*SCALE).
                                 when "0001" | "0010" | "0011" => -- Memory indirect preindexed.
                                     if FETCH_MEM_ADR = '1' then
+-- Base register suppress?
+if B_S = '0' then
                                         ADR_EFF_VAR := PCVAR + BASE_DISPL + INDEX_SCALED;
+else
+    ADR_EFF_VAR := BASE_DISPL + INDEX_SCALED;
+end if;
                                     else
                                         ADR_EFF_VAR := MEM_ADR + OUTER_DISPL;
                                     end if;
                                 when "0101" | "0110" | "0111" => -- Memory indirect postindexed.
                                     if FETCH_MEM_ADR = '1' then
+-- Base register suppress?
+if B_S = '0' then
                                         ADR_EFF_VAR := PCVAR + BASE_DISPL;
+else
+    ADR_EFF_VAR := BASE_DISPL;
+end if;
                                     else
                                         ADR_EFF_VAR := MEM_ADR + INDEX_SCALED + OUTER_DISPL;
                                     end if;
                                 when "1001" | "1010" | "1011" => -- Memory indirect.
                                     if FETCH_MEM_ADR = '1' then
+-- Base register suppress?
+if B_S = '0' then
                                         ADR_EFF_VAR := PCVAR + BASE_DISPL;
+else
+    ADR_EFF_VAR := BASE_DISPL;
+end if;
                                     else
                                         ADR_EFF_VAR := MEM_ADR + OUTER_DISPL;
                                     end if;

@@ -18,6 +18,7 @@
 //#define kint char
 
 //#define _HAS_STDLIB_
+
 //#define _HAS_FILE_
 //#define _HAS_FLOAT_
 //#define _ARDUINO_
@@ -28,8 +29,7 @@
 #include <stdio.h>
 #ifdef _HAS_STDLIB_
 #include <stdlib.h>
-//#include <time.h>
-
+#include <time.h>
 #endif
 #else
 #ifdef _ZPUino_Timer_
@@ -41,11 +41,6 @@ long ti=1L;
 #include <stdio.h>
 #include "../timer/tick.h"
 #endif
-
-long time(int time)
-{
-    return * (long *) 0xfffffff8;
-}
 
 #define GESAMT_X   5    /* Breite des gesamten Puzzles, SPEZIFISCH */
 #define GESAMT_Y   5    /* Hoehe des gesamten Puzzles, SPEZIFISCH */

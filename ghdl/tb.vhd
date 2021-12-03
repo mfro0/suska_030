@@ -38,8 +38,8 @@ architecture sim of tb is
     end function to32;
 
 
-    -- 40K of 32 bit memory
-    signal memory               : memarray(0 to 40960)(31 downto 0) :=
+    -- 64K of 32 bit memory
+    signal memory               : memarray(0 to 10240 - 1)(31 downto 0) :=
     (
         0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
@@ -94,13 +94,86 @@ architecture sim of tb is
             for i in sd'low to sd'high loop
                 -- do a sanity check to avoid bailout when stackpointer is
                 -- uninitialised during core startup
-                if unsigned(sp) / 4 > 32d"5" and unsigned(sp) / 4 < 32d"20480"  then
+                if unsigned(sp) / 4 > mem'low + d"5" and unsigned(sp) / 4 < mem'high - d"5"  then
                     sd(i) <= mem(to_integer(unsigned(s)) / 4 + i);
                 end if;
             end loop;
         end if;
     end procedure stack_viewer;
 
+    --
+    -- this is a trivial stupid copy of table 12-1
+    -- from the MC68030 User's manual
+    --
+    function byteselect(mem_in : in std_ulogic_vector(31 downto 0);
+                        s_n : in std_ulogic_vector(1 downto 0);
+                        bs : in std_ulogic_vector(1 downto 0);
+                        dout : in std_ulogic_vector(31 downto 0)) return std_ulogic_vector is
+        variable mem : std_ulogic_vector(mem_in'range);
+    begin
+        mem := mem_in;
+        case s_n is
+            when "01" => -- byte size
+                case bs is  -- select byte in long
+                    when "00" =>
+                        mem(31 downto 24) := dout(31 downto 24);
+                    when "01" =>
+                        mem(23 downto 16) := dout(23 downto 16);
+                    when "10" =>
+                        mem(15 downto 8) := dout(15 downto 8);
+                    when "11" =>
+                        mem(7 downto 0) := dout(7 downto 0);
+                    when others =>
+                        null;
+                end case;
+
+            when "10" =>
+                case bs is -- select word in long
+                    when "00" =>
+                        mem(31 downto 16) := dout(31 downto 16);
+                    when "01" =>
+                        mem(23 downto 8) := dout(23 downto 8);
+                    when "10" =>
+                        mem(15 downto 0) := dout(15 downto 0);
+                    when "11" =>
+                        mem(7 downto 0) := dout(7 downto 0);
+                    when others =>
+                        null;
+                end case;
+
+            when "11" =>
+                case bs is -- select three bytes in long
+                    when "00" =>
+                        mem(31 downto 8) := dout(31 downto 8);
+                    when "01" =>
+                        mem(23 downto 0) := dout(23 downto 0);
+                    when "10" =>
+                        mem(15 downto 0) := dout(15 downto 0);
+                    when "11" =>
+                        mem(7 downto 0) := dout(7 downto 0);
+                    when others =>
+                        null;
+                end case;
+
+            when "00" =>
+                case bs is -- select appropriate part of long word
+                    when "00" =>
+                        mem(31 downto 0) := dout(31 downto 0);
+                    when "01" =>
+                        mem(23 downto 0) := dout(23 downto 0);
+                    when "10" =>
+                        mem(15 downto 0) := dout(15 downto 0);
+                    when "11" =>
+                        mem(7 downto 0) := dout(7 downto 0);
+                    when others =>
+                        null;
+                end case;
+            when others =>
+                null;
+        end case;
+
+        return mem;
+    end function byteselect;
 begin
 
     reset_n <= '0', '1' after 520 * 40 ns;
@@ -179,9 +252,14 @@ begin
                             data_in <= memory(adr);
                         end if;
                     else        -- write to memory
-                        memory(adr) <= data_out;
+                        --if dben_n = '0' then
+                            memory(adr) <= byteselect(memory(adr), size_n, adr_out(1 downto 0), data_out);
+                            -- report to_hstring(adr_out) & "=" & to_hstring(byteselect(memory(adr), size_n, adr_out(1 downto 0), data_out)) severity note;
+                            -- memory(adr) <= data_out;
+                        --end if;
                     end if;
                     dsack_n <= (others => '0');           -- indicate 32 bit port size
+                    --dsack_n <= size_n;
                 elsif reset_n = '1' and dben_n = '0' then
                     berr_n <= '0';
                 end if;
