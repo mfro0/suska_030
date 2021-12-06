@@ -10,7 +10,7 @@ endif
 PROJ=wf68k30L_top.qsf
 BITSTREAM=output_files/$(patsubst %.qpf,%,$(PROJ)).sof
 
-all: synthesis fitter assembler timing_analyzer eda ghdl
+all: synthesis fitter assembler timing_analyzer eda ghdl modelsim
 #precmd synthesis fitter assembler timing_analyzer eda
 
 precmd:
@@ -38,6 +38,10 @@ p: $(BITSTREAM)
 .PHONY: ghdl
 ghdl:
 	cd ghdl; make
+
+.PHONY: modelsim
+modelsim:
+	cd modelsim; make
 
 .PHONY: clean
 clean:

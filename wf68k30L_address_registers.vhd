@@ -136,7 +136,7 @@ entity WF68K30L_ADDRESS_REGISTERS is
         PC_RESTORE          : in bit;
         PC_OFFSET           : in std_logic_vector(7 downto 0);
 
-        sp                  : out std_ulogic_vector(31 downto 0)
+        sp                  : out std_logic_vector(31 downto 0)
     );
 end entity WF68K30L_ADDRESS_REGISTERS;
 

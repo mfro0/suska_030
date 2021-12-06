@@ -23,9 +23,9 @@ FILES = \
 all:
 	(cd ..; tclsh ./embed_m68k.tcl)
 	echo $(PATH)
-	vlib work
-	vcom -2008 $(FILES)
-	vcom -2008 ../ghdl/tb.vhd
+	$(VLIB) work
+	$(VCOM) -2008 $(FILES)
+	$(VCOM) -2008 ../ghdl/tb.vhd
 
 run:
 	$(VSIM) tb
