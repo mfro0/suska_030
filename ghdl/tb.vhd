@@ -41,7 +41,7 @@ architecture sim of tb is
     -- 64K of 32 bit memory
     signal memory               : memarray(0 to 10240 - 1)(31 downto 0) :=
     (
-        0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
+        0 to (work.m68k_rom.m68k_binary'length + 4) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
     );
 
