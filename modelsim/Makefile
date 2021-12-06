@@ -21,6 +21,7 @@ FILES = \
 	../simple.vhd
 
 all:
+	(cd ..; tclsh ./embed_m68k.tcl)
 	echo $(PATH)
 	vlib work
 	vcom -2008 $(FILES)
@@ -29,3 +30,5 @@ all:
 run:
 	$(VSIM) tb
 
+clean:
+	rm -rf work
