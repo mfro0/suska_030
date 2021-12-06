@@ -84,7 +84,7 @@ architecture sim of tb is
     --
     -- Build a small array around memory the stack pointer points to.
     -- This enables waveform viewers to display stack and memory around
-    -- (-5 to +5 long words below and above where s points to)
+    -- (-3 to +3 long words below and above where s points to)
     --
     procedure stack_viewer(signal s : in std_logic_vector(31 downto 0);
                            signal mem : in memarray;
@@ -94,7 +94,7 @@ architecture sim of tb is
             for i in sd'low to sd'high loop
                 -- do a sanity check to avoid bailout when stackpointer is
                 -- uninitialised during core startup
-                if unsigned(sp) / 4 > mem'low + d"5" and unsigned(sp) / 4 < mem'high - d"5"  then
+                if signed(s) / 4 + to_signed(sd'low, 32) >= mem'low and unsigned(s) / 4 + sd'high <= mem'high then
                     sd(i) <= mem(to_integer(unsigned(s)) / 4 + i);
                 end if;
             end loop;
