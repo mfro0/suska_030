@@ -7,7 +7,7 @@ loop:		movem.l	d0,-(sp)
 		lea	-2*4(sp),sp
 		move.l	d0,(sp)
 		lsl.l	#4,d0
-		*nop
+		nop
 		move.l	(array,d0.l),4(sp)
 		pea	message
                 bsr     _printf

@@ -19,7 +19,7 @@ architecture sim of tb is
     -- convert a byte-organised array into a longword-organised
     -- one.
     function to32(a : work.m68k_rom.ubyte_array) return memarray is
-        variable res : memarray(0 to (a'length + 4) / 4)(31 downto 0);
+        variable res : memarray(0 to (a'length + 3) / 4)(31 downto 0);
         variable last32 : std_ulogic_vector(31 downto 0);
         constant rest : natural := a'length mod 4;
     begin
@@ -41,7 +41,7 @@ architecture sim of tb is
     -- 64K of 32 bit memory
     signal memory               : memarray(0 to 10240 - 1)(31 downto 0) :=
     (
-        0 to (work.m68k_rom.m68k_binary'length + 4) / 4 => to32(work.m68k_rom.m68k_binary),
+        0 to (work.m68k_rom.m68k_binary'length + 3) / 4 => to32(work.m68k_rom.m68k_binary),
         others => (others => '0')
     );
 
@@ -94,7 +94,7 @@ architecture sim of tb is
             for i in sd'low to sd'high loop
                 -- do a sanity check to avoid bailout when stackpointer is
                 -- uninitialised during core startup
-                if signed(s) / 4 + to_signed(sd'low, 32) >= mem'low and unsigned(s) / 4 + sd'high <= mem'high then
+                if signed(s) / 4 + i > mem'low and signed(s) / 4 - i < mem'high then
                     sd(i) <= mem(to_integer(unsigned(s)) / 4 + i);
                 end if;
             end loop;
@@ -202,7 +202,7 @@ begin
     end process p_clkit;
 
     -- external names not (yet) working in ghdl
-    -- stack_viewer(<<signal .i_m68030.i_addressregisters.isp_reg : std_logic_vector(31 downto 0)>>, stack);
+    -- stack_viewer(<<signal i_m68030.i_addressregisters.isp_reg : std_logic_vector(31 downto 0)>>, memory, stack);
     stack_viewer(sp, memory, stack);
 
     p_read : process(all)
