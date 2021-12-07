@@ -32,15 +32,15 @@ add wave -noupdate -radix hexadecimal /tb/i_m68030/I_ADDRESSREGISTERS/AR(5)
 add wave -noupdate -radix hexadecimal /tb/i_m68030/I_ADDRESSREGISTERS/AR(6)
 add wave -noupdate -divider SP
 add wave -noupdate -radix hexadecimal /tb/sp
-add wave -noupdate -radix hexadecimal /tb/stack(3)
-add wave -noupdate -radix hexadecimal /tb/stack(2)
-add wave -noupdate -radix hexadecimal /tb/stack(1)
-add wave -noupdate -radix hexadecimal /tb/stack(0)
-add wave -noupdate -radix hexadecimal /tb/stack(-1)
-add wave -noupdate -radix hexadecimal /tb/stack(-2)
-add wave -noupdate -radix hexadecimal /tb/stack(-3)
+add wave -noupdate -label {(sp + 12)} -radix hexadecimal /tb/stack(3)
+add wave -noupdate -label {(sp + 8)} -radix hexadecimal /tb/stack(2)
+add wave -noupdate -label {(sp + 4)} -radix hexadecimal /tb/stack(1)
+add wave -noupdate -label (sp) -radix hexadecimal /tb/stack(0)
+add wave -noupdate -label {(sp - 4)} -radix hexadecimal /tb/stack(-1)
+add wave -noupdate -label {(sp - 8)} -radix hexadecimal /tb/stack(-2)
+add wave -noupdate -label {(sp - 12)} -radix hexadecimal /tb/stack(-3)
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {36767599162 ps} 0} {{Cursor 2} {503242562 ps} 0}
+WaveRestoreCursors {{Cursor 1} {28399754995 ps} 0} {{Cursor 2} {28400430034 ps} 0}
 quietly wave cursor active 2
 configure wave -namecolwidth 323
 configure wave -valuecolwidth 100
@@ -56,4 +56,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits ps
 update
-WaveRestoreZoom {19519603455 ps} {19523220871 ps}
+WaveRestoreZoom {28397165225 ps} {28399373001 ps}
